@@ -21,6 +21,18 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    pwd = st.text_input("Nhập mật khẩu", type="password")
+    if pwd == st.secrets["APP_PASSWORD"]:
+        st.session_state.authenticated = True
+        st.rerun()
+    elif pwd:
+        st.error("Mật khẩu không đúng.")
+    st.stop()
+
 with st.sidebar:
     page = st.radio(
         "Chọn dashboard",
