@@ -557,7 +557,7 @@ def render_overview_page():
         )
         huy_labels = (
             alt.Chart(huy_prod_df)
-            .mark_text(dy=-8, fontSize=12, fontWeight="normal")
+            .mark_text(dy=-8, fontSize=12, fontWeight="normal", color="#d71149")
             .encode(
                 x=alt.X("PROD_CODE:N", sort=huy_order),
                 y=alt.Y("Tỷ lệ hủy:Q"),
@@ -708,4 +708,16 @@ def render_overview_page():
             ],
         )
     )
-    st.altair_chart(nm_bars.properties(height=266), width='stretch')
+    nm_melted["label"] = nm_melted["Số đơn"].apply(lambda v: f"{int(v):,}" if v > 0 else "")
+    nm_labels = (
+        alt.Chart(nm_melted[nm_melted["Số đơn"] > 0])
+        .mark_text(dy=-6, fontSize=11, fontWeight="normal")
+        .encode(
+            x=alt.X("Tháng:O"),
+            y=alt.Y("Số đơn:Q"),
+            xOffset=alt.XOffset("Nhóm:N", sort=nhom_domain_nm),
+            color=alt.Color("Nhóm:N", scale=alt.Scale(domain=nhom_domain_nm, range=nhom_range_nm)),
+            text=alt.Text("label:N"),
+        )
+    )
+    st.altair_chart((nm_bars + nm_labels).properties(height=266), width='stretch')
