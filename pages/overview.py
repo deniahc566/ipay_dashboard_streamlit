@@ -51,7 +51,7 @@ def _fmt_currency(value: float) -> str:
 
 def render_overview_page():
     st.markdown(
-        '<style>section[data-testid="stMain"]{zoom:1;}</style>',
+        '<style>section[data-testid="stMain"]{zoom:1.0;}</style>',
         unsafe_allow_html=True,
     )
     st.title("BÁO CÁO TỔNG QUAN BẢO HIỂM VBI QUA KÊNH IPAY")
