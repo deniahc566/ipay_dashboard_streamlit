@@ -513,7 +513,7 @@ def render_overview_page():
                  [_HUY_COLORS[i % 2] for i in range(len(years))]
         return domain, rng
 
-    col_huy, col_new_prod, col_new_month = st.columns(3)
+    col_huy, col_new_prod = st.columns(2)
 
     # ── Chart: Tỷ lệ hủy chủ động theo sản phẩm ─────────────────────────────
     with col_huy:
@@ -646,66 +646,66 @@ def render_overview_page():
         )
         st.altair_chart((np_bars + np_labels).properties(height=266), width='stretch')
 
-    # ── Chart: Số đơn cấp mới và số đơn hủy theo tháng (no labels) ──────────
-    with col_new_month:
-        _chart_title("Số đơn cấp mới và số đơn hủy theo tháng")
-        selected_new_prods = st.multiselect(
-            "Lọc sản phẩm",
-            options=sorted(_NAMED_PRODUCTS) + ["Sản phẩm khác"],
-            default=[],
-            placeholder="Tất cả sản phẩm",
-            key="new_month_prods",
+    # ── Row 4: Số đơn cấp mới và số đơn hủy theo tháng ──────────────────────
+    st.markdown('<div style="margin-top:8px;"></div>', unsafe_allow_html=True)
+    _chart_title("Số đơn cấp mới và số đơn hủy theo tháng")
+    selected_new_prods = st.multiselect(
+        "Lọc sản phẩm",
+        options=sorted(_NAMED_PRODUCTS) + ["Sản phẩm khác"],
+        default=[],
+        placeholder="Tất cả sản phẩm",
+        key="new_month_prods",
+    )
+    if selected_new_prods:
+        mask_new = _group_prod(df["PROD_CODE"]).isin(selected_new_prods)
+        df_new_month = df[mask_new]
+    else:
+        df_new_month = df
+    new_monthly_agg = (
+        df_new_month.assign(
+            Tháng=df_new_month["Ngày phát sinh"].dt.month,
+            Năm=df_new_month["Năm"].astype(str),
         )
-        if selected_new_prods:
-            mask_new = _group_prod(df["PROD_CODE"]).isin(selected_new_prods)
-            df_new_month = df[mask_new]
-        else:
-            df_new_month = df
-        new_monthly_agg = (
-            df_new_month.assign(
-                Tháng=df_new_month["Ngày phát sinh"].dt.month,
-                Năm=df_new_month["Năm"].astype(str),
-            )
-            .groupby(["Năm", "Tháng"], as_index=False)[["Số đơn cấp mới", "Số đơn hủy webview"]]
-            .sum()
+        .groupby(["Năm", "Tháng"], as_index=False)[["Số đơn cấp mới", "Số đơn hủy webview"]]
+        .sum()
+    )
+    year_list_new = new_monthly_agg["Năm"].unique().tolist()
+    full_grid_new = pd.DataFrame(
+        [(y, m) for y in year_list_new for m in range(1, 13)],
+        columns=["Năm", "Tháng"],
+    )
+    new_monthly_agg = full_grid_new.merge(new_monthly_agg, on=["Năm", "Tháng"], how="left").fillna(0)
+    years_nm = sorted(new_monthly_agg["Năm"].unique().tolist())
+    nhom_domain_nm, nhom_range_nm = _build_nhom_scale(years_nm)
+    nm_melted = (
+        new_monthly_agg
+        .melt(
+            id_vars=["Năm", "Tháng"],
+            value_vars=["Số đơn cấp mới", "Số đơn hủy webview"],
+            var_name="Loại_raw", value_name="Số đơn",
         )
-        year_list_new = new_monthly_agg["Năm"].unique().tolist()
-        full_grid_new = pd.DataFrame(
-            [(y, m) for y in year_list_new for m in range(1, 13)],
-            columns=["Năm", "Tháng"],
+        .assign(Loại=lambda x: x["Loại_raw"].map(_LOAI_RAW_MAP))
+    )
+    nm_melted["Nhóm"] = nm_melted["Loại"] + " " + nm_melted["Năm"]
+    _nm_color = alt.Color(
+        "Nhóm:N",
+        legend=None,
+        scale=alt.Scale(domain=nhom_domain_nm, range=nhom_range_nm),
+    )
+    nm_bars = (
+        alt.Chart(nm_melted)
+        .mark_bar()
+        .encode(
+            x=alt.X("Tháng:O", title=None, axis=alt.Axis(labelAngle=0)),
+            y=alt.Y("Số đơn:Q", title=None, axis=None),
+            xOffset=alt.XOffset("Nhóm:N", sort=nhom_domain_nm),
+            color=_nm_color,
+            tooltip=[
+                alt.Tooltip("Tháng:O", title="Tháng"),
+                alt.Tooltip("Loại:N", title="Loại"),
+                alt.Tooltip("Năm:N", title="Năm"),
+                alt.Tooltip("Số đơn:Q", title="Số đơn", format=",.0f"),
+            ],
         )
-        new_monthly_agg = full_grid_new.merge(new_monthly_agg, on=["Năm", "Tháng"], how="left").fillna(0)
-        years_nm = sorted(new_monthly_agg["Năm"].unique().tolist())
-        nhom_domain_nm, nhom_range_nm = _build_nhom_scale(years_nm)
-        nm_melted = (
-            new_monthly_agg
-            .melt(
-                id_vars=["Năm", "Tháng"],
-                value_vars=["Số đơn cấp mới", "Số đơn hủy webview"],
-                var_name="Loại_raw", value_name="Số đơn",
-            )
-            .assign(Loại=lambda x: x["Loại_raw"].map(_LOAI_RAW_MAP))
-        )
-        nm_melted["Nhóm"] = nm_melted["Loại"] + " " + nm_melted["Năm"]
-        _nm_color = alt.Color(
-            "Nhóm:N",
-            legend=None,
-            scale=alt.Scale(domain=nhom_domain_nm, range=nhom_range_nm),
-        )
-        nm_bars = (
-            alt.Chart(nm_melted)
-            .mark_bar()
-            .encode(
-                x=alt.X("Tháng:O", title=None, axis=alt.Axis(labelAngle=0)),
-                y=alt.Y("Số đơn:Q", title=None, axis=None),
-                xOffset=alt.XOffset("Nhóm:N", sort=nhom_domain_nm),
-                color=_nm_color,
-                tooltip=[
-                    alt.Tooltip("Tháng:O", title="Tháng"),
-                    alt.Tooltip("Loại:N", title="Loại"),
-                    alt.Tooltip("Năm:N", title="Năm"),
-                    alt.Tooltip("Số đơn:Q", title="Số đơn", format=",.0f"),
-                ],
-            )
-        )
-        st.altair_chart(nm_bars.properties(height=266), width='stretch')
+    )
+    st.altair_chart(nm_bars.properties(height=266), width='stretch')
