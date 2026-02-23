@@ -288,8 +288,8 @@ def render_overview_page():
                 "Δ Hủy chủ động":   _pfx(_huy, lambda v: f"{int(v):,}"),
             })
         _detail_df = pd.DataFrame(_rows).set_index("Sản phẩm")
-        _green = ["Δ Tiền thực thu", "Δ Cấp mới", "Δ Tái tục", "Δ KH hiện hữu"]
-        _red   = ["Δ Hủy chủ động"]
+        _green = ("Δ Tiền thực thu", "Δ Cấp mới", "Δ Tái tục", "Δ KH hiện hữu")
+        _red   = ("Δ Hủy chủ động",)
         _styled = (
             _detail_df.style
             .map(lambda _: "color:#2e7d32;font-weight:600", subset=_green)
