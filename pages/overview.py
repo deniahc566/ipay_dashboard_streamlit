@@ -35,8 +35,8 @@ def _load_data() -> pd.DataFrame:
 def _chart_title(text: str) -> None:
     """st.subheader replacement at 70% of default subheader size (~1.05 rem)."""
     st.markdown(
-        f'<p style="font-size:1.05rem;font-weight:600;color:rgb(49,51,63);'
-        f'margin:0 0 0.4rem 0;line-height:1.3;">{text}</p>',
+        f'<p style="font-size:0.74rem;font-weight:600;color:rgb(49,51,63);'
+        f'margin:0 0 0.28rem 0;line-height:1.3;">{text}</p>',
         unsafe_allow_html=True,
     )
 
@@ -51,7 +51,7 @@ def _fmt_currency(value: float) -> str:
 
 def render_overview_page():
     st.markdown(
-        '<style>section[data-testid="stMain"]{zoom:1.0;}</style>',
+        '<style>section[data-testid="stMain"]{zoom:1;}</style>',
         unsafe_allow_html=True,
     )
     st.title("BÁO CÁO TỔNG QUAN BẢO HIỂM VBI QUA KÊNH IPAY")
@@ -108,13 +108,13 @@ def render_overview_page():
 
     def _yoy_caption(current_val: float, yoy_val: float, fmt_fn) -> str:
         if yoy_val == 0:
-            return f'<span style="font-size:0.8rem;color:#888">Cùng kỳ {prev_year}: N/A</span>'
+            return f'<span style="font-size:0.56rem;color:#888">Cùng kỳ {prev_year}: N/A</span>'
         pct   = (current_val - yoy_val) / abs(yoy_val)
         arrow = "▲" if pct > 0 else "▼"
         color = "#2e7d32" if pct > 0 else "#c62828"
         return (
-            f'<span style="font-size:0.8rem;color:#888">Cùng kỳ {prev_year}: {fmt_fn(yoy_val)}&nbsp;&nbsp;</span>'
-            f'<span style="font-size:0.8rem;font-weight:600;color:{color}">{arrow} {pct:+.1%}</span>'
+            f'<span style="font-size:0.56rem;color:#888">Cùng kỳ {prev_year}: {fmt_fn(yoy_val)}&nbsp;&nbsp;</span>'
+            f'<span style="font-size:0.56rem;font-weight:600;color:{color}">{arrow} {pct:+.1%}</span>'
         )
 
     # ── Shared constants (needed by both delta and chart sections) ───────────
@@ -165,33 +165,33 @@ def render_overview_page():
         if progress_pct is not None:
             fill = f"{progress_pct * 100:.1f}%"
             sidebar = (
-                f'<div style="width:6px;border-radius:4px;background:#e8e8e8;flex-shrink:0;'
+                f'<div style="width:4px;border-radius:3px;background:#e8e8e8;flex-shrink:0;'
                 f'position:relative;overflow:hidden;">'
                 f'<div style="position:absolute;bottom:0;width:100%;height:{fill};'
-                f'background:{accent_color};border-radius:4px;"></div></div>'
+                f'background:{accent_color};border-radius:3px;"></div></div>'
             )
-            pad_left = "14px"
+            pad_left = "10px"
         else:
             sidebar   = ""
-            pad_left  = "20px"
+            pad_left  = "14px"
         # Dùng list + join để không tạo blank line — blank line phá HTML block trong markdown
         parts = [
-            f'<div style="background:#ffffff;border:1px solid #e0e0e0;border-radius:12px;'
-            f'padding:20px 20px 16px {pad_left};box-shadow:0 2px 8px rgba(0,0,0,0.06);'
-            f'display:flex;gap:12px;align-items:stretch;min-height:180px;">',
+            f'<div style="background:#ffffff;border:1px solid #e0e0e0;border-radius:8px;'
+            f'padding:14px 14px 11px {pad_left};box-shadow:0 2px 8px rgba(0,0,0,0.06);'
+            f'display:flex;gap:8px;align-items:stretch;min-height:126px;">',
             sidebar,
             f'<div style="flex:1;min-width:0;">',
-            f'<div style="font-size:0.78rem;font-weight:600;color:#555;text-transform:uppercase;'
-            f'letter-spacing:0.04em;margin-bottom:6px;">{label}</div>',
-            f'<div style="font-size:1.8rem;font-weight:700;color:#1a1a2e;line-height:1.1;">{value}</div>',
+            f'<div style="font-size:0.55rem;font-weight:600;color:#555;text-transform:uppercase;'
+            f'letter-spacing:0.04em;margin-bottom:4px;">{label}</div>',
+            f'<div style="font-size:1.26rem;font-weight:700;color:#1a1a2e;line-height:1.1;">{value}</div>',
         ]
         if subtitle:
-            parts.append(f'<div style="font-size:0.8rem;color:#888;margin-top:2px;">{subtitle}</div>')
+            parts.append(f'<div style="font-size:0.56rem;color:#888;margin-top:1px;">{subtitle}</div>')
         parts.append(
-            f'<div style="margin-top:5px;font-size:0.82rem;font-weight:600;color:{delta_color};">{delta_str}</div>'
+            f'<div style="margin-top:3px;font-size:0.57rem;font-weight:600;color:{delta_color};">{delta_str}</div>'
         )
         if yoy_html:
-            parts.append(f'<div style="margin-top:5px;">{yoy_html}</div>')
+            parts.append(f'<div style="margin-top:3px;">{yoy_html}</div>')
         parts += ['</div>', '</div>']
         return "".join(parts)
 
@@ -291,7 +291,7 @@ def render_overview_page():
             .map(lambda _: "color:#2e7d32;font-weight:600", subset=_green)
             .map(lambda _: "color:#d71149;font-weight:600", subset=_red)
         )
-        st.dataframe(_styled, use_container_width=True)
+        st.dataframe(_styled, width='stretch')
 
     # ── Shared helpers ────────────────────────────────────────────────────────
     _NAMED_PRODUCTS = {"MIX_01", "VTB_HOMESAVING", "TAPCARE", "ISAFE_CYBER"}
@@ -321,11 +321,11 @@ def render_overview_page():
     _chart_title("Số khách hàng hiện hữu theo sản phẩm")
 
     _legend_html = (
-        '<div style="display:flex;gap:20px;margin-bottom:8px;font-size:0.82rem;">'
-        '<span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;'
-        'background:#6b3fa0;margin-right:5px;vertical-align:middle;"></span>Có hiệu lực</span>'
-        '<span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;'
-        'background:#b39ddb;margin-right:5px;vertical-align:middle;"></span>Tạm ngưng</span>'
+        '<div style="display:flex;gap:14px;margin-bottom:6px;font-size:0.57rem;">'
+        '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;'
+        'background:#6b3fa0;margin-right:4px;vertical-align:middle;"></span>Có hiệu lực</span>'
+        '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;'
+        'background:#b39ddb;margin-right:4px;vertical-align:middle;"></span>Tạm ngưng</span>'
         '</div>'
     )
     st.markdown(_legend_html, unsafe_allow_html=True)
@@ -340,7 +340,7 @@ def render_overview_page():
         })
         pie = (
             alt.Chart(pie_df)
-            .mark_arc(innerRadius=50)
+            .mark_arc(innerRadius=35)
             .encode(
                 theta=alt.Theta("Số đơn:Q"),
                 color=alt.Color(
@@ -356,19 +356,19 @@ def render_overview_page():
                     alt.Tooltip("Số đơn:Q", title="Số đơn", format=",.0f"),
                 ],
             )
-            .properties(title=prod, height=220)
+            .properties(title=prod, height=154)
         )
         total_str  = f"{total/1e6:.3f} triệu" if total >= 1_000_000 else f"{total:,}"
         hieu_luc   = row["Số đơn có hiệu lực"]
         pct_hieu   = hieu_luc / total if total > 0 else 0
         with col:
-            st.altair_chart(pie, use_container_width=True)
+            st.altair_chart(pie, width='stretch')
             st.markdown(
-                f'<div style="text-align:center;font-size:0.85rem;color:#444;margin-top:-8px;">'
+                f'<div style="text-align:center;font-size:0.60rem;color:#444;margin-top:-6px;">'
                 f'Tổng KH hiện hữu<br>'
-                f'<strong style="font-size:1rem;color:#1a1a2e;">{total_str}</strong>'
+                f'<strong style="font-size:0.70rem;color:#1a1a2e;">{total_str}</strong>'
                 f'</div>'
-                f'<div style="text-align:center;font-size:0.82rem;color:#6b3fa0;margin-top:4px;">'
+                f'<div style="text-align:center;font-size:0.57rem;color:#6b3fa0;margin-top:3px;">'
                 f'Có hiệu lực: <strong>{pct_hieu:.1%}</strong>'
                 f'</div>',
                 unsafe_allow_html=True,
@@ -434,7 +434,7 @@ def render_overview_page():
                 text=alt.Text("label:N"),
             )
         )
-        st.altair_chart((bars + labels).properties(height=400), use_container_width=True)
+        st.altair_chart((bars + labels).properties(height=280), width='stretch')
 
     # ── Chart 2: Tiền thực thu theo tháng (bar) ───────────────────────────────
     with col_trend:
@@ -493,7 +493,7 @@ def render_overview_page():
                 text=alt.Text("label:N"),
             )
         )
-        st.altair_chart((m_bars + m_labels).properties(height=400), use_container_width=True)
+        st.altair_chart((m_bars + m_labels).properties(height=280), width='stretch')
 
     # ── Row 2: Tỷ lệ hủy | Cấp mới + hủy theo sản phẩm | Cấp mới + hủy theo tháng ──
     _CAP_COLORS = ["#6A415E", "#B07A9E"]
@@ -558,8 +558,8 @@ def render_overview_page():
             )
         )
         st.altair_chart(
-            (huy_bars + huy_labels).properties(height=380),
-            use_container_width=True,
+            (huy_bars + huy_labels).properties(height=266),
+            width='stretch',
         )
 
     # ── Chart: Số đơn cấp mới và số đơn hủy theo sản phẩm ───────────────────
@@ -637,7 +637,7 @@ def render_overview_page():
                 text=alt.Text("label:N"),
             )
         )
-        st.altair_chart((np_bars + np_labels).properties(height=380), use_container_width=True)
+        st.altair_chart((np_bars + np_labels).properties(height=266), width='stretch')
 
     # ── Chart: Số đơn cấp mới và số đơn hủy theo tháng (no labels) ──────────
     with col_new_month:
@@ -701,4 +701,4 @@ def render_overview_page():
                 ],
             )
         )
-        st.altair_chart(nm_bars.properties(height=380), use_container_width=True)
+        st.altair_chart(nm_bars.properties(height=266), width='stretch')
