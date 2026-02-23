@@ -621,7 +621,7 @@ def render_overview_page():
             alt.Chart(np_melted)
             .mark_bar()
             .encode(
-                x=alt.X("PROD_CODE:N", title=None, sort=new_prod_order, axis=alt.Axis(labelAngle=, labelFontSize=11, labelLimit=0)),
+                x=alt.X("PROD_CODE:N", title=None, sort=new_prod_order, axis=alt.Axis(labelAngle=0, labelFontSize=11, labelLimit=0)),
                 y=alt.Y("Số đơn:Q", title=None, axis=None),
                 xOffset=alt.XOffset("Nhóm:N", sort=nhom_domain_np),
                 color=_np_color,
