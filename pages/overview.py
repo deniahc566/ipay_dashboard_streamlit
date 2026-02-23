@@ -441,7 +441,7 @@ def render_overview_page():
                 text=alt.Text("label:N"),
             )
         )
-        st.altair_chart((bars + labels).properties(height=280), width='stretch')
+        st.altair_chart((bars + labels).properties(height=280, padding={"left": 80, "right": 10, "top": 10, "bottom": 10}), width='stretch')
 
     # ── Chart 2: Tiền thực thu theo tháng (bar) ───────────────────────────────
     with col_trend:
@@ -565,7 +565,7 @@ def render_overview_page():
             )
         )
         st.altair_chart(
-            (huy_bars + huy_labels).properties(height=266),
+            (huy_bars + huy_labels).properties(height=266, padding={"left": 80, "right": 10, "top": 10, "bottom": 10}),
             width='stretch',
         )
 
@@ -644,7 +644,7 @@ def render_overview_page():
                 text=alt.Text("label:N"),
             )
         )
-        st.altair_chart((np_bars + np_labels).properties(height=266), width='stretch')
+        st.altair_chart((np_bars + np_labels).properties(height=266, padding={"left": 80, "right": 10, "top": 10, "bottom": 10}), width='stretch')
 
     # ── Chart: Số đơn cấp mới và số đơn hủy theo tháng (no labels) ──────────
     with col_new_month:
