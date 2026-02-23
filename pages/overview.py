@@ -419,7 +419,7 @@ def render_overview_page():
             alt.Chart(chart_df)
             .mark_bar()
             .encode(
-                x=alt.X("PROD_CODE:N", title=None, sort=prod_order, axis=alt.Axis(labelAngle=-30, labelLimit=0)),
+                x=alt.X("PROD_CODE:N", title=None, sort=prod_order, axis=alt.Axis(labelAngle=0, labelLimit=0)),
                 y=alt.Y("Tiền thực thu:Q", title=None, axis=None),
                 color=alt.Color("Năm:N", title="Năm", legend=None, scale=alt.Scale(range=["#2C4C7B", "#6B9ED4"])),
                 xOffset=alt.XOffset("Năm:N"),
@@ -547,7 +547,7 @@ def render_overview_page():
             alt.Chart(huy_prod_df)
             .mark_bar(color="#d71149")
             .encode(
-                x=alt.X("PROD_CODE:N", sort=huy_order, title=None, axis=alt.Axis(labelAngle=-30, labelLimit=0)),
+                x=alt.X("PROD_CODE:N", sort=huy_order, title=None, axis=alt.Axis(labelAngle=0, labelLimit=0)),
                 y=alt.Y("Tỷ lệ hủy:Q", title=None, axis=None),
                 tooltip=[
                     alt.Tooltip("PROD_CODE:N", title="Sản phẩm"),
@@ -621,7 +621,7 @@ def render_overview_page():
             alt.Chart(np_melted)
             .mark_bar()
             .encode(
-                x=alt.X("PROD_CODE:N", title=None, sort=new_prod_order, axis=alt.Axis(labelAngle=-30, labelFontSize=11, labelLimit=0)),
+                x=alt.X("PROD_CODE:N", title=None, sort=new_prod_order, axis=alt.Axis(labelAngle=, labelFontSize=11, labelLimit=0)),
                 y=alt.Y("Số đơn:Q", title=None, axis=None),
                 xOffset=alt.XOffset("Nhóm:N", sort=nhom_domain_np),
                 color=_np_color,
