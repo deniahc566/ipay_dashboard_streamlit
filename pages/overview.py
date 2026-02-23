@@ -50,6 +50,10 @@ def _fmt_currency(value: float) -> str:
 
 
 def render_overview_page():
+    st.markdown(
+        '<style>section[data-testid="stMain"]{zoom:0.8;}</style>',
+        unsafe_allow_html=True,
+    )
     st.title("BÁO CÁO TỔNG QUAN BẢO HIỂM VBI QUA KÊNH IPAY")
 
     try:
@@ -299,6 +303,76 @@ def render_overview_page():
 
     def _group_prod(series: pd.Series) -> pd.Series:
         return series.where(series.isin(_NAMED_PRODUCTS), other="Sản phẩm khác")
+
+    # ── KH hiện hữu — pie chart mỗi sản phẩm ────────────────────────────────
+    kh_prod_df = (
+        df[df["Ngày phát sinh"] == last_date]
+        .assign(PROD_CODE=lambda x: _group_prod(x["PROD_CODE"]))
+        .groupby("PROD_CODE", as_index=False)[["Số đơn có hiệu lực", "Số đơn tạm ngưng"]]
+        .sum()
+    )
+    kh_prod_df = (
+        kh_prod_df[kh_prod_df["PROD_CODE"].isin(_NAMED_PRODUCTS)]
+        .copy()
+    )
+    kh_prod_df["total"] = kh_prod_df["Số đơn có hiệu lực"] + kh_prod_df["Số đơn tạm ngưng"]
+    kh_prod_df = kh_prod_df.sort_values("total", ascending=False).reset_index(drop=True)
+
+    _chart_title("Số khách hàng hiện hữu theo sản phẩm")
+
+    _legend_html = (
+        '<div style="display:flex;gap:20px;margin-bottom:8px;font-size:0.82rem;">'
+        '<span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;'
+        'background:#6b3fa0;margin-right:5px;vertical-align:middle;"></span>Có hiệu lực</span>'
+        '<span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;'
+        'background:#b39ddb;margin-right:5px;vertical-align:middle;"></span>Tạm ngưng</span>'
+        '</div>'
+    )
+    st.markdown(_legend_html, unsafe_allow_html=True)
+
+    kh_cols = st.columns(len(kh_prod_df))
+    for col, (_, row) in zip(kh_cols, kh_prod_df.iterrows()):
+        prod  = row["PROD_CODE"]
+        total = int(row["total"])
+        pie_df = pd.DataFrame({
+            "Loại":   ["Có hiệu lực", "Tạm ngưng"],
+            "Số đơn": [row["Số đơn có hiệu lực"], row["Số đơn tạm ngưng"]],
+        })
+        pie = (
+            alt.Chart(pie_df)
+            .mark_arc(innerRadius=50)
+            .encode(
+                theta=alt.Theta("Số đơn:Q"),
+                color=alt.Color(
+                    "Loại:N",
+                    scale=alt.Scale(
+                        domain=["Có hiệu lực", "Tạm ngưng"],
+                        range=["#6b3fa0", "#b39ddb"],
+                    ),
+                    legend=None,
+                ),
+                tooltip=[
+                    alt.Tooltip("Loại:N",   title="Loại"),
+                    alt.Tooltip("Số đơn:Q", title="Số đơn", format=",.0f"),
+                ],
+            )
+            .properties(title=prod, height=220)
+        )
+        total_str  = f"{total/1e6:.3f} triệu" if total >= 1_000_000 else f"{total:,}"
+        hieu_luc   = row["Số đơn có hiệu lực"]
+        pct_hieu   = hieu_luc / total if total > 0 else 0
+        with col:
+            st.altair_chart(pie, use_container_width=True)
+            st.markdown(
+                f'<div style="text-align:center;font-size:0.85rem;color:#444;margin-top:-8px;">'
+                f'Tổng KH hiện hữu<br>'
+                f'<strong style="font-size:1rem;color:#1a1a2e;">{total_str}</strong>'
+                f'</div>'
+                f'<div style="text-align:center;font-size:0.82rem;color:#6b3fa0;margin-top:4px;">'
+                f'Có hiệu lực: <strong>{pct_hieu:.1%}</strong>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
     # ── Row 1: revenue by product | revenue by month ─────────────────────────
     col_rev, col_trend = st.columns(2)
@@ -628,75 +702,3 @@ def render_overview_page():
             )
         )
         st.altair_chart(nm_bars.properties(height=380), use_container_width=True)
-
-    # ── Row 3: KH hiện hữu — pie chart mỗi sản phẩm ─────────────────────────
-    kh_prod_df = (
-        df[df["Ngày phát sinh"] == last_date]
-        .assign(PROD_CODE=lambda x: _group_prod(x["PROD_CODE"]))
-        .groupby("PROD_CODE", as_index=False)[["Số đơn có hiệu lực", "Số đơn tạm ngưng"]]
-        .sum()
-    )
-    # Chỉ lấy 4 sản phẩm chính, sắp xếp theo tổng giảm dần
-    kh_prod_df = (
-        kh_prod_df[kh_prod_df["PROD_CODE"].isin(_NAMED_PRODUCTS)]
-        .copy()
-    )
-    kh_prod_df["total"] = kh_prod_df["Số đơn có hiệu lực"] + kh_prod_df["Số đơn tạm ngưng"]
-    kh_prod_df = kh_prod_df.sort_values("total", ascending=False).reset_index(drop=True)
-
-    _chart_title("Số khách hàng hiện hữu theo sản phẩm")
-
-    # Shared legend (1 lần ở trên)
-    _legend_html = (
-        '<div style="display:flex;gap:20px;margin-bottom:8px;font-size:0.82rem;">'
-        '<span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;'
-        'background:#6b3fa0;margin-right:5px;vertical-align:middle;"></span>Có hiệu lực</span>'
-        '<span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;'
-        'background:#b39ddb;margin-right:5px;vertical-align:middle;"></span>Tạm ngưng</span>'
-        '</div>'
-    )
-    st.markdown(_legend_html, unsafe_allow_html=True)
-
-    kh_cols = st.columns(len(kh_prod_df))
-    for col, (_, row) in zip(kh_cols, kh_prod_df.iterrows()):
-        prod  = row["PROD_CODE"]
-        total = int(row["total"])
-        pie_df = pd.DataFrame({
-            "Loại":   ["Có hiệu lực", "Tạm ngưng"],
-            "Số đơn": [row["Số đơn có hiệu lực"], row["Số đơn tạm ngưng"]],
-        })
-        pie = (
-            alt.Chart(pie_df)
-            .mark_arc(innerRadius=50)
-            .encode(
-                theta=alt.Theta("Số đơn:Q"),
-                color=alt.Color(
-                    "Loại:N",
-                    scale=alt.Scale(
-                        domain=["Có hiệu lực", "Tạm ngưng"],
-                        range=["#6b3fa0", "#b39ddb"],
-                    ),
-                    legend=None,
-                ),
-                tooltip=[
-                    alt.Tooltip("Loại:N",   title="Loại"),
-                    alt.Tooltip("Số đơn:Q", title="Số đơn", format=",.0f"),
-                ],
-            )
-            .properties(title=prod, height=220)
-        )
-        total_str  = f"{total/1e6:.3f} triệu" if total >= 1_000_000 else f"{total:,}"
-        hieu_luc   = row["Số đơn có hiệu lực"]
-        pct_hieu   = hieu_luc / total if total > 0 else 0
-        with col:
-            st.altair_chart(pie, use_container_width=True)
-            st.markdown(
-                f'<div style="text-align:center;font-size:0.85rem;color:#444;margin-top:-8px;">'
-                f'Tổng KH hiện hữu<br>'
-                f'<strong style="font-size:1rem;color:#1a1a2e;">{total_str}</strong>'
-                f'</div>'
-                f'<div style="text-align:center;font-size:0.82rem;color:#6b3fa0;margin-top:4px;">'
-                f'Có hiệu lực: <strong>{pct_hieu:.1%}</strong>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
