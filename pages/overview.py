@@ -35,7 +35,7 @@ def _load_data() -> pd.DataFrame:
 def _chart_title(text: str) -> None:
     """st.subheader replacement at 70% of default subheader size (~1.05 rem)."""
     st.markdown(
-        f'<p style="font-size:0.74rem;font-weight:600;color:rgb(49,51,63);'
+        f'<p style="font-size:0.89rem;font-weight:600;color:rgb(49,51,63);'
         f'margin:0 0 0.28rem 0;line-height:1.3;">{text}</p>',
         unsafe_allow_html=True,
     )
@@ -54,7 +54,11 @@ def render_overview_page():
         '<style>section[data-testid="stMain"]{zoom:1;}</style>',
         unsafe_allow_html=True,
     )
-    st.title("BÁO CÁO TỔNG QUAN BẢO HIỂM VBI QUA KÊNH IPAY")
+    st.markdown(
+        '<h1 style="font-size:1.4rem;font-weight:700;white-space:nowrap;margin-bottom:0.5rem;">'
+        'BÁO CÁO TỔNG QUAN BẢO HIỂM VBI QUA KÊNH IPAY</h1>',
+        unsafe_allow_html=True,
+    )
 
     try:
         full_df = _load_data()
@@ -318,6 +322,7 @@ def render_overview_page():
     kh_prod_df["total"] = kh_prod_df["Số đơn có hiệu lực"] + kh_prod_df["Số đơn tạm ngưng"]
     kh_prod_df = kh_prod_df.sort_values("total", ascending=False).reset_index(drop=True)
 
+    st.markdown('<div style="margin-top:32px;"></div>', unsafe_allow_html=True)
     _chart_title("Số khách hàng hiện hữu theo sản phẩm")
 
     _legend_html = (
@@ -340,7 +345,7 @@ def render_overview_page():
         })
         pie = (
             alt.Chart(pie_df)
-            .mark_arc(innerRadius=35)
+            .mark_arc(innerRadius=42)
             .encode(
                 theta=alt.Theta("Số đơn:Q"),
                 color=alt.Color(
@@ -356,7 +361,7 @@ def render_overview_page():
                     alt.Tooltip("Số đơn:Q", title="Số đơn", format=",.0f"),
                 ],
             )
-            .properties(title=prod, height=154)
+            .properties(title=prod, height=185)
         )
         total_str  = f"{total/1e6:.3f} triệu" if total >= 1_000_000 else f"{total:,}"
         hieu_luc   = row["Số đơn có hiệu lực"]
@@ -373,6 +378,8 @@ def render_overview_page():
                 f'</div>',
                 unsafe_allow_html=True,
             )
+
+    st.markdown('<div style="margin-bottom:32px;"></div>', unsafe_allow_html=True)
 
     # ── Row 1: revenue by product | revenue by month ─────────────────────────
     col_rev, col_trend = st.columns(2)
@@ -412,7 +419,7 @@ def render_overview_page():
             alt.Chart(chart_df)
             .mark_bar()
             .encode(
-                x=alt.X("PROD_CODE:N", title=None, sort=prod_order, axis=alt.Axis(labelAngle=0)),
+                x=alt.X("PROD_CODE:N", title=None, sort=prod_order, axis=alt.Axis(labelAngle=-30, labelLimit=0)),
                 y=alt.Y("Tiền thực thu:Q", title=None, axis=None),
                 color=alt.Color("Năm:N", title="Năm", legend=None, scale=alt.Scale(range=["#2C4C7B", "#6B9ED4"])),
                 xOffset=alt.XOffset("Năm:N"),
@@ -425,7 +432,7 @@ def render_overview_page():
         )
         labels = (
             alt.Chart(chart_df)
-            .mark_text(dy=-6, fontSize=10, fontWeight="normal")
+            .mark_text(dy=-6, fontSize=12, fontWeight="normal")
             .encode(
                 x=alt.X("PROD_CODE:N", sort=prod_order),
                 y=alt.Y("Tiền thực thu:Q"),
@@ -484,7 +491,7 @@ def render_overview_page():
         )
         m_labels = (
             alt.Chart(monthly_df[monthly_df["Tiền thực thu"] > 0])
-            .mark_text(dy=-6, fontSize=10, fontWeight="normal")
+            .mark_text(dy=-6, fontSize=12, fontWeight="normal")
             .encode(
                 x=alt.X("Tháng:O"),
                 y=alt.Y("Tiền thực thu:Q"),
@@ -540,7 +547,7 @@ def render_overview_page():
             alt.Chart(huy_prod_df)
             .mark_bar(color="#d71149")
             .encode(
-                x=alt.X("PROD_CODE:N", sort=huy_order, title=None, axis=alt.Axis(labelAngle=0)),
+                x=alt.X("PROD_CODE:N", sort=huy_order, title=None, axis=alt.Axis(labelAngle=-30, labelLimit=0)),
                 y=alt.Y("Tỷ lệ hủy:Q", title=None, axis=None),
                 tooltip=[
                     alt.Tooltip("PROD_CODE:N", title="Sản phẩm"),
@@ -550,7 +557,7 @@ def render_overview_page():
         )
         huy_labels = (
             alt.Chart(huy_prod_df)
-            .mark_text(dy=-8, fontSize=10, fontWeight="normal")
+            .mark_text(dy=-8, fontSize=12, fontWeight="normal")
             .encode(
                 x=alt.X("PROD_CODE:N", sort=huy_order),
                 y=alt.Y("Tỷ lệ hủy:Q"),
@@ -614,7 +621,7 @@ def render_overview_page():
             alt.Chart(np_melted)
             .mark_bar()
             .encode(
-                x=alt.X("PROD_CODE:N", title=None, sort=new_prod_order, axis=alt.Axis(labelAngle=0, labelFontSize=9, labelLimit=120)),
+                x=alt.X("PROD_CODE:N", title=None, sort=new_prod_order, axis=alt.Axis(labelAngle=-30, labelFontSize=11, labelLimit=0)),
                 y=alt.Y("Số đơn:Q", title=None, axis=None),
                 xOffset=alt.XOffset("Nhóm:N", sort=nhom_domain_np),
                 color=_np_color,
@@ -628,7 +635,7 @@ def render_overview_page():
         )
         np_labels = (
             alt.Chart(np_melted[np_melted["Số đơn"] > 0])
-            .mark_text(dy=-6, fontSize=9, fontWeight="normal")
+            .mark_text(dy=-6, fontSize=11, fontWeight="normal")
             .encode(
                 x=alt.X("PROD_CODE:N", sort=new_prod_order),
                 y=alt.Y("Số đơn:Q"),
