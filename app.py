@@ -25,6 +25,7 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
+    st.title("Báo cáo Bảo hiểm qua VBI qua kênh IPAY")
     pwd = st.text_input("Nhập mật khẩu", type="password")
     if pwd == st.secrets["APP_PASSWORD"]:
         st.session_state.authenticated = True
