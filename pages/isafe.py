@@ -316,6 +316,7 @@ def render_isafe_page():
         # Accumulators for totals
         tot_so_don = tot_so_don_30 = 0.0
         tot_tien = tot_tien_30 = tot_tien_dk = 0.0
+        tot_cap_moi = tot_cap_moi_30 = 0.0
         tot_huy = tot_tai_tuc = tot_tai_tuc_dk = tot_tang_truong = 0.0
 
         prev_tang_truong = None
@@ -339,14 +340,16 @@ def render_isafe_page():
             tt_rate     = tai_tuc / ttdk if ttdk > 0 else 0.0
             tang_truong = cap_moi - huy - ttdk + tai_tuc
 
-            tot_so_don     += so_don
-            tot_so_don_30  += so_don_30
-            tot_tien       += tien
-            tot_tien_30    += tien_30
-            tot_tien_dk    += tien_dk
-            tot_huy        += huy
-            tot_tai_tuc    += tai_tuc
-            tot_tai_tuc_dk += ttdk
+            tot_so_don      += so_don
+            tot_so_don_30   += so_don_30
+            tot_tien        += tien
+            tot_tien_30     += tien_30
+            tot_tien_dk     += tien_dk
+            tot_cap_moi     += cap_moi
+            tot_cap_moi_30  += cap_moi_30
+            tot_huy         += huy
+            tot_tai_tuc     += tai_tuc
+            tot_tai_tuc_dk  += ttdk
             tot_tang_truong += tang_truong
 
             # Arrow for tăng trưởng: compare to previous day; colour by sign if no prev
@@ -371,11 +374,14 @@ def render_isafe_page():
                 f'<td style="padding:4px 8px;text-align:right;color:#888;">{tien_30:,.0f}</td>'
                 f'<td style="padding:4px 8px;text-align:right;color:#2C4C7B;">{tien_dk:,.0f}</td>'
                 f'<td style="padding:4px 8px;text-align:right;">'
+                f'{_arrow(cap_moi, cap_moi_30)}{int(cap_moi):,}</td>'
+                f'<td style="padding:4px 8px;text-align:right;color:#888;">{int(cap_moi_30):,}</td>'
+                f'<td style="padding:4px 8px;text-align:right;">'
                 f'{_arrow(huy, huy_30, higher_is_good=False)}'
                 f'{int(huy):,}</td>'
+                f'<td style="padding:4px 8px;text-align:right;">{tt_rate:.1%}</td>'
                 f'<td style="padding:4px 8px;text-align:right;font-weight:600;color:{_tt_val_color};">'
                 f'{arr_tt}{int(tang_truong):,}</td>'
-                f'<td style="padding:4px 8px;text-align:right;">{tt_rate:.1%}</td>'
                 f'</tr>'
             )
 
@@ -388,9 +394,11 @@ def render_isafe_page():
             f'<td style="padding:5px 8px;text-align:right;">{tot_tien:,.0f}</td>'
             f'<td style="padding:5px 8px;text-align:right;opacity:0.75;">{tot_tien_30:,.0f}</td>'
             f'<td style="padding:5px 8px;text-align:right;">{tot_tien_dk:,.0f}</td>'
+            f'<td style="padding:5px 8px;text-align:right;">{int(tot_cap_moi):,}</td>'
+            f'<td style="padding:5px 8px;text-align:right;opacity:0.75;">{int(tot_cap_moi_30):,}</td>'
             f'<td style="padding:5px 8px;text-align:right;">{int(tot_huy):,}</td>'
-            f'<td style="padding:5px 8px;text-align:right;">{int(tot_tang_truong):,}</td>'
             f'<td style="padding:5px 8px;text-align:right;">{tot_tt_rate:.1%}</td>'
+            f'<td style="padding:5px 8px;text-align:right;">{int(tot_tang_truong):,}</td>'
             f'</tr>'
         )
 
@@ -401,9 +409,11 @@ def render_isafe_page():
             "Tiền thực thu",
             "Tiền TT 30NT",
             "Tiền TT dự kiến",
+            "Số đơn cấp mới",
+            "Số đơn cấp mới 30NT",
             "Số đơn hủy",
-            "Số KH tăng trưởng",
             "Tỷ lệ TT / DK",
+            "Số KH tăng trưởng",
         ]
         header_html = "".join(
             f'<th style="padding:6px 8px;text-align:{"left" if i == 0 else "right"};'
