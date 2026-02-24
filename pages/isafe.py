@@ -427,6 +427,135 @@ def render_isafe_page():
         else:
             st.info("Không có dữ liệu để vẽ biểu đồ.")
 
+    # ── Row 3: Tỷ lệ hủy & tái tục theo tháng ───────────────────────────────
+    st.markdown('<div style="margin-top:24px;"></div>', unsafe_allow_html=True)
+    rate_cols = st.columns(2)
+
+    with rate_cols[0]:
+        st.markdown(
+            '<p style="font-size:0.89rem;font-weight:600;color:rgb(49,51,63);margin:0 0 0.28rem 0;">'
+            'Tỷ lệ hủy theo tháng</p>',
+            unsafe_allow_html=True,
+        )
+        _monthly_huy = (
+            df.assign(Tháng=df["Ngày phát sinh"].dt.to_period("M").astype(str))
+            .groupby("Tháng", as_index=False)
+            .agg(
+                huy=("Số đơn hủy webview", "sum"),
+                cap=("Số đơn cấp mới", "sum"),
+                tai_tuc=("Số đơn cấp tái tục", "sum"),
+            )
+        )
+        _monthly_huy["Tỷ lệ hủy"] = (
+            _monthly_huy["huy"]
+            / (_monthly_huy["cap"] + _monthly_huy["tai_tuc"]).replace(0, float("nan"))
+        )
+        _monthly_huy["label"] = _monthly_huy["Tỷ lệ hủy"].apply(
+            lambda v: f"{v:.1%}" if pd.notna(v) else ""
+        )
+        if not _monthly_huy.empty:
+            _huy_m_bars = (
+                alt.Chart(_monthly_huy)
+                .mark_bar(color="#d71149")
+                .encode(
+                    x=alt.X("Tháng:N", title=None, axis=alt.Axis(labelAngle=0)),
+                    y=alt.Y("Tỷ lệ hủy:Q", title=None, axis=None),
+                    tooltip=[
+                        alt.Tooltip("Tháng:N", title="Tháng"),
+                        alt.Tooltip("label:N", title="Tỷ lệ hủy"),
+                    ],
+                )
+            )
+            _huy_m_labels = (
+                alt.Chart(_monthly_huy[_monthly_huy["Tỷ lệ hủy"] > 0])
+                .mark_text(dy=-6, fontSize=11, fontWeight="normal", color="#d71149")
+                .encode(
+                    x=alt.X("Tháng:N"),
+                    y=alt.Y("Tỷ lệ hủy:Q"),
+                    text=alt.Text("label:N"),
+                )
+            )
+            st.altair_chart(
+                (_huy_m_bars + _huy_m_labels).properties(height=220),
+                width='stretch',
+            )
+        else:
+            st.info("Không có dữ liệu.")
+
+    with rate_cols[1]:
+        st.markdown(
+            '<p style="font-size:0.89rem;font-weight:600;color:rgb(49,51,63);margin:0 0 0.28rem 0;">'
+            'Tái tục thực tế vs dự kiến theo tháng</p>',
+            unsafe_allow_html=True,
+        )
+        _monthly_tt = (
+            df.assign(Tháng=df["Ngày phát sinh"].dt.to_period("M").astype(str))
+            .groupby("Tháng", as_index=False)
+            .agg(
+                tai_tuc=("Số đơn cấp tái tục", "sum"),
+                tai_tuc_dk=("Số đơn tái tục dự kiến", "sum"),
+            )
+        )
+        _tt_order = ["Thực tế", "Dự kiến"]
+        _melted_tt = _monthly_tt.melt(
+            id_vars="Tháng",
+            value_vars=["tai_tuc", "tai_tuc_dk"],
+            var_name="Loại_raw",
+            value_name="Số đơn",
+        ).assign(
+            Loại=lambda x: x["Loại_raw"].map({"tai_tuc": "Thực tế", "tai_tuc_dk": "Dự kiến"})
+        )
+        _melted_tt["label"] = _melted_tt["Số đơn"].apply(lambda v: f"{int(v):,}")
+        if not _melted_tt.empty:
+            st.markdown(
+                '<div style="display:flex;gap:14px;margin-bottom:6px;font-size:0.57rem;">'
+                '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;'
+                'background:#2C7B6F;margin-right:4px;vertical-align:middle;"></span>Thực tế</span>'
+                '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;'
+                'background:#6DB4AC;margin-right:4px;vertical-align:middle;"></span>Dự kiến</span>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+            _tt_bars = (
+                alt.Chart(_melted_tt)
+                .mark_bar()
+                .encode(
+                    x=alt.X("Tháng:N", title=None, axis=alt.Axis(labelAngle=0)),
+                    y=alt.Y("Số đơn:Q", title=None, axis=None),
+                    color=alt.Color(
+                        "Loại:N",
+                        scale=alt.Scale(domain=_tt_order, range=["#2C7B6F", "#6DB4AC"]),
+                        legend=None,
+                    ),
+                    xOffset=alt.XOffset("Loại:N", sort=_tt_order),
+                    tooltip=[
+                        alt.Tooltip("Tháng:N", title="Tháng"),
+                        alt.Tooltip("Loại:N", title="Loại"),
+                        alt.Tooltip("label:N", title="Số đơn"),
+                    ],
+                )
+            )
+            _tt_labels = (
+                alt.Chart(_melted_tt[_melted_tt["Số đơn"] > 0])
+                .mark_text(dy=-6, fontSize=11, fontWeight="normal")
+                .encode(
+                    x=alt.X("Tháng:N", sort=None),
+                    y=alt.Y("Số đơn:Q"),
+                    xOffset=alt.XOffset("Loại:N", sort=_tt_order),
+                    color=alt.Color(
+                        "Loại:N",
+                        scale=alt.Scale(domain=_tt_order, range=["#2C7B6F", "#6DB4AC"]),
+                    ),
+                    text=alt.Text("label:N"),
+                )
+            )
+            st.altair_chart(
+                (_tt_bars + _tt_labels).properties(height=220),
+                width='stretch',
+            )
+        else:
+            st.info("Không có dữ liệu.")
+
     # ── Daily detail table ────────────────────────────────────────────────────
     st.markdown('<div style="margin-top:28px;"></div>', unsafe_allow_html=True)
     st.markdown(
