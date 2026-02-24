@@ -43,8 +43,14 @@ def _fmt_currency(value: float) -> str:
 
 def _kpi_card(
     label, value, delta_str, delta_color,
-    accent_color="#2C4C7B", yoy_html="",
+    accent_color="#2C4C7B", yoy_html="", tooltip="",
 ):
+    _label_html = label
+    if tooltip:
+        _label_html += (
+            f'&nbsp;<abbr title="{tooltip}" '
+            f'style="font-size:0.65rem;color:#aaa;cursor:help;text-decoration:none;">ℹ</abbr>'
+        )
     parts = [
         f'<div style="background:#ffffff;border:1px solid #e0e0e0;border-radius:8px;'
         f'padding:14px 14px 11px 10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);'
@@ -52,7 +58,7 @@ def _kpi_card(
         f'<div style="width:4px;border-radius:3px;background:{accent_color};flex-shrink:0;"></div>',
         f'<div style="flex:1;min-width:0;">',
         f'<div style="font-size:0.55rem;font-weight:600;color:#555;text-transform:uppercase;'
-        f'letter-spacing:0.04em;margin-bottom:4px;">{label}</div>',
+        f'letter-spacing:0.04em;margin-bottom:4px;">{_label_html}</div>',
         f'<div style="font-size:1.26rem;font-weight:700;color:#1a1a2e;line-height:1.1;">{value}</div>',
         f'<div style="margin-top:3px;font-size:0.57rem;font-weight:600;color:{delta_color};">{delta_str}</div>',
     ]
@@ -113,13 +119,20 @@ def render_isafe_page():
 
     tong_tai_tuc_dk = df["Số đơn tái tục dự kiến"].sum()
 
-    kh_hien_huu  = int(last_df["Số đơn có hiệu lực"].sum())
-    ty_le_huy    = tong_huy / (tong_cap_moi + tong_tai_tuc) if (tong_cap_moi + tong_tai_tuc) > 0 else 0
+    kh_hien_huu   = int(last_df["Số đơn có hiệu lực"].sum())
+    ty_le_huy     = tong_huy / (tong_cap_moi + tong_tai_tuc) if (tong_cap_moi + tong_tai_tuc) > 0 else 0
     ty_le_tai_tuc = tong_tai_tuc / tong_tai_tuc_dk if tong_tai_tuc_dk > 0 else 0
+    tong_tang_truong = int(tong_cap_moi - tong_huy - tong_tai_tuc_dk + tong_tai_tuc)
 
     # ── Deltas vs previous day ────────────────────────────────────────────────
-    delta_tien    = last_df["Tiền thực thu"].sum()
-    delta_cap_moi = int(last_df["Số đơn cấp mới"].sum())
+    delta_tien       = last_df["Tiền thực thu"].sum()
+    delta_cap_moi    = int(last_df["Số đơn cấp mới"].sum())
+    delta_tang_truong = int(
+        last_df["Số đơn cấp mới"].sum()
+        - last_df["Số đơn hủy webview"].sum()
+        - last_df["Số đơn tái tục dự kiến"].sum()
+        + last_df["Số đơn cấp tái tục"].sum()
+    )
 
     kh_prev  = int(prev_df["Số đơn có hiệu lực"].sum())
     delta_kh = kh_hien_huu - kh_prev
@@ -150,6 +163,12 @@ def render_isafe_page():
     ]
     yoy_tien         = yoy_df["Tiền thực thu"].sum()
     yoy_cap_moi      = int(yoy_df["Số đơn cấp mới"].sum())
+    yoy_tang_truong  = int(
+        yoy_df["Số đơn cấp mới"].sum()
+        - yoy_df["Số đơn hủy webview"].sum()
+        - yoy_df["Số đơn tái tục dự kiến"].sum()
+        + yoy_df["Số đơn cấp tái tục"].sum()
+    )
     yoy_tai_tuc_dk   = yoy_df["Số đơn tái tục dự kiến"].sum()
     yoy_ty_le_tai_tuc = (
         yoy_df["Số đơn cấp tái tục"].sum() / yoy_tai_tuc_dk
@@ -195,14 +214,16 @@ def render_isafe_page():
         ), unsafe_allow_html=True)
 
     with cols[1]:
-        _cap_sign = "+" if delta_cap_moi >= 0 else ""
+        _tg_color = "#2e7d32" if delta_tang_truong >= 0 else "#c62828"
+        _tg_sign  = "+" if delta_tang_truong >= 0 else ""
         st.markdown(_kpi_card(
-            label="Tổng số đơn cấp mới",
-            value=f"{tong_cap_moi:,}",
-            delta_str=f"{_cap_sign}{delta_cap_moi:,}",
-            delta_color="#2e7d32",
+            label="Số KH tăng trưởng",
+            value=f"{tong_tang_truong:,}",
+            delta_str=f"{_tg_sign}{delta_tang_truong:,}",
+            delta_color=_tg_color,
             accent_color="#6A415E",
-            yoy_html=_yoy_caption(tong_cap_moi, yoy_cap_moi, lambda v: f"{int(v):,}"),
+            yoy_html=_yoy_caption(tong_tang_truong, yoy_tang_truong, lambda v: f"{int(v):,}"),
+            tooltip="Cấp mới − Hủy − Tái tục dự kiến + Tái tục thực tế",
         ), unsafe_allow_html=True)
 
     with cols[2]:

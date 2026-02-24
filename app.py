@@ -37,7 +37,7 @@ if not st.session_state.authenticated:
 with st.sidebar:
     page = st.radio(
         "Chọn dashboard",
-        options=["Tổng quan hàng ngày", "Vận hành chi tiết"],
+        options=["Tổng quan", "iSafe"],
         label_visibility="collapsed",
     )
 
