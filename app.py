@@ -8,7 +8,10 @@ if str(_HERE) not in sys.path:
 import streamlit as st
 
 from pages.overview import render_overview_page
+from pages.cyber_risk import render_cyber_risk_page
 from pages.isafe import render_isafe_page
+from pages.tapcare import render_tapcare_page
+from pages.homesaving import render_homesaving_page
 
 st.set_page_config(
     page_title="VBI iPay Dashboard",
@@ -37,11 +40,17 @@ if not st.session_state.authenticated:
 with st.sidebar:
     page = st.radio(
         "Chọn dashboard",
-        options=["Tổng quan", "iSafe"],
+        options=["Tổng quan", "Cyber Risk", "ISAFE", "TapCare", "Nhà và bạn"],
         label_visibility="collapsed",
     )
 
 if page == "Tổng quan":
     render_overview_page()
-else:
+elif page == "Cyber Risk":
+    render_cyber_risk_page()
+elif page == "ISAFE":
     render_isafe_page()
+elif page == "TapCare":
+    render_tapcare_page()
+else:
+    render_homesaving_page()
