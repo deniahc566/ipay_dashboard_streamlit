@@ -238,6 +238,168 @@ def render_isafe_page():
             yoy_html=_yoy_caption(ty_le_tai_tuc, yoy_ty_le_tai_tuc, lambda v: f"{v:.1%}"),
         ), unsafe_allow_html=True)
 
+    # ── Daily detail table ────────────────────────────────────────────────────
+    st.markdown('<div style="margin-top:28px;"></div>', unsafe_allow_html=True)
+    st.markdown(
+        '<p style="font-size:0.89rem;font-weight:600;color:rgb(49,51,63);'
+        'margin:0 0 0.5rem 0;line-height:1.3;">Bảng chi tiết theo ngày</p>',
+        unsafe_allow_html=True,
+    )
+
+    _now = pd.Timestamp.now()
+    tbl_cols = st.columns([1, 1, 6])
+    with tbl_cols[0]:
+        tbl_month = st.selectbox(
+            "Tháng",
+            options=list(range(1, 13)),
+            index=_now.month - 1,
+            key="isafe_tbl_month",
+        )
+    with tbl_cols[1]:
+        tbl_year_opts = sorted(
+            isafe_full_df["Năm"].dropna().unique().astype(int).tolist(), reverse=True
+        )
+        tbl_year = st.selectbox(
+            "Năm", options=tbl_year_opts, index=0, key="isafe_tbl_year"
+        )
+
+    day_df = (
+        isafe_full_df[
+            (isafe_full_df["Ngày phát sinh"].dt.month == tbl_month) &
+            (isafe_full_df["Năm"] == tbl_year)
+        ]
+        .groupby("Ngày phát sinh", as_index=False)
+        .agg(
+            tien=("Tiền thực thu", "sum"),
+            tai_tuc=("Số đơn cấp tái tục", "sum"),
+            tai_tuc_dk=("Số đơn tái tục dự kiến", "sum"),
+            huy=("Số đơn hủy webview", "sum"),
+        )
+        .sort_values("Ngày phát sinh")
+        .reset_index(drop=True)
+    )
+
+    if day_df.empty:
+        st.info("Không có dữ liệu cho tháng/năm đã chọn.")
+    else:
+        # Fast lookup dict keyed by Timestamp
+        _lkmap = (
+            isafe_full_df
+            .groupby("Ngày phát sinh")
+            .agg(
+                tien=("Tiền thực thu", "sum"),
+                cap_moi=("Số đơn cấp mới", "sum"),
+                tai_tuc_dk=("Số đơn tái tục dự kiến", "sum"),
+                huy=("Số đơn hủy webview", "sum"),
+            )
+            .to_dict(orient="index")
+        )
+
+        def _lk(date, field, offset):
+            return float(_lkmap.get(date + pd.Timedelta(days=offset), {}).get(field, 0.0))
+
+        def _arrow(current, ref, higher_is_good=True):
+            if ref == 0:
+                if current > 0:
+                    c = "#2e7d32" if higher_is_good else "#c62828"
+                    return f'<span style="color:{c}">▲&nbsp;</span>'
+                return ""
+            if current > ref:
+                c = "#2e7d32" if higher_is_good else "#c62828"
+                return f'<span style="color:{c}">▲&nbsp;</span>'
+            if current < ref:
+                c = "#c62828" if higher_is_good else "#2e7d32"
+                return f'<span style="color:{c}">▼&nbsp;</span>'
+            return ""
+
+        # Accumulators for totals
+        tot_so_don = tot_so_don_30 = 0.0
+        tot_tien = tot_tien_30 = tot_tien_dk = 0.0
+        tot_huy = tot_tai_tuc = tot_tai_tuc_dk = 0.0
+
+        html_rows = []
+        for i, r in day_df.iterrows():
+            d        = r["Ngày phát sinh"]
+            tien     = r["tien"]
+            tai_tuc  = r["tai_tuc"]
+            ttdk     = r["tai_tuc_dk"]
+            huy      = r["huy"]
+
+            tien_30      = _lk(d, "tien",      -30)
+            cap_moi_30   = _lk(d, "cap_moi",   -30)
+            ttdk_5       = _lk(d, "tai_tuc_dk", +5)
+
+            so_don     = tien / 5000
+            so_don_30  = tien_30 / 5000
+            tien_dk    = cap_moi_30 * ty_le_huy + ttdk * 0.9 - ttdk_5 * 5000 + tien_30 * 0.95
+            tt_rate    = tai_tuc / ttdk if ttdk > 0 else 0.0
+
+            tot_so_don    += so_don
+            tot_so_don_30 += so_don_30
+            tot_tien      += tien
+            tot_tien_30   += tien_30
+            tot_tien_dk   += tien_dk
+            tot_huy       += huy
+            tot_tai_tuc   += tai_tuc
+            tot_tai_tuc_dk += ttdk
+
+            bg = "#ffffff" if i % 2 == 0 else "#f8f9fa"
+            html_rows.append(
+                f'<tr style="background:{bg};">'
+                f'<td style="padding:4px 8px;font-weight:500;">{d.day}</td>'
+                f'<td style="padding:4px 8px;text-align:right;">'
+                f'{_arrow(so_don, so_don_30)}{int(round(so_don)):,}</td>'
+                f'<td style="padding:4px 8px;text-align:right;color:#888;">{int(round(so_don_30)):,}</td>'
+                f'<td style="padding:4px 8px;text-align:right;">'
+                f'{_arrow(tien, tien_30)}{tien:,.0f}</td>'
+                f'<td style="padding:4px 8px;text-align:right;color:#888;">{tien_30:,.0f}</td>'
+                f'<td style="padding:4px 8px;text-align:right;color:#2C4C7B;">{tien_dk:,.0f}</td>'
+                f'<td style="padding:4px 8px;text-align:right;">'
+                f'{_arrow(huy, _lk(d, "huy", -30), higher_is_good=False)}'
+                f'{int(huy):,}</td>'
+                f'<td style="padding:4px 8px;text-align:right;">{tt_rate:.1%}</td>'
+                f'</tr>'
+            )
+
+        tot_tt_rate = tot_tai_tuc / tot_tai_tuc_dk if tot_tai_tuc_dk > 0 else 0.0
+        total_row = (
+            f'<tr style="background:#2C4C7B;color:white;font-weight:600;">'
+            f'<td style="padding:5px 8px;">Tổng</td>'
+            f'<td style="padding:5px 8px;text-align:right;">{int(round(tot_so_don)):,}</td>'
+            f'<td style="padding:5px 8px;text-align:right;opacity:0.75;">{int(round(tot_so_don_30)):,}</td>'
+            f'<td style="padding:5px 8px;text-align:right;">{tot_tien:,.0f}</td>'
+            f'<td style="padding:5px 8px;text-align:right;opacity:0.75;">{tot_tien_30:,.0f}</td>'
+            f'<td style="padding:5px 8px;text-align:right;">{tot_tien_dk:,.0f}</td>'
+            f'<td style="padding:5px 8px;text-align:right;">{int(tot_huy):,}</td>'
+            f'<td style="padding:5px 8px;text-align:right;">{tot_tt_rate:.1%}</td>'
+            f'</tr>'
+        )
+
+        _HEADERS = [
+            "Ngày",
+            "Số đơn thu được phí",
+            "Số đơn 30NT",
+            "Tiền thực thu",
+            "Tiền TT 30NT",
+            "Tiền TT dự kiến",
+            "Số đơn hủy",
+            "Tỷ lệ TT / DK",
+        ]
+        header_html = "".join(
+            f'<th style="padding:6px 8px;text-align:{"left" if i == 0 else "right"};'
+            f'white-space:nowrap;">{h}</th>'
+            for i, h in enumerate(_HEADERS)
+        )
+        st.markdown(
+            f'<div style="overflow-x:auto;margin-top:4px;">'
+            f'<table style="width:100%;border-collapse:collapse;font-size:0.75rem;">'
+            f'<thead><tr style="background:#2C4C7B;color:white;">{header_html}</tr></thead>'
+            f'<tbody>{"".join(html_rows)}</tbody>'
+            f'<tfoot>{total_row}</tfoot>'
+            f'</table></div>',
+            unsafe_allow_html=True,
+        )
+
 
 # Alias for backward compatibility with app.py
 render_operations_page = render_isafe_page
