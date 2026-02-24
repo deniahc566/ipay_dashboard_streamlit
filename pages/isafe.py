@@ -10,6 +10,7 @@ _NUMERIC_COLS = [
     "Tiền thực thu",
     "Số đơn cấp mới",
     "Số đơn cấp tái tục",
+    "Số đơn tái tục dự kiến",
     "Số đơn có hiệu lực",
     "Số đơn tạm ngưng",
     "Số đơn hủy webview",
@@ -110,8 +111,11 @@ def render_isafe_page():
     tong_tai_tuc = int(df["Số đơn cấp tái tục"].sum())
     tong_huy     = df["Số đơn hủy webview"].sum()
 
-    kh_hien_huu = int(last_df["Số đơn có hiệu lực"].sum())
-    ty_le_huy   = tong_huy / (tong_cap_moi + tong_tai_tuc) if (tong_cap_moi + tong_tai_tuc) > 0 else 0
+    tong_tai_tuc_dk = df["Số đơn tái tục dự kiến"].sum()
+
+    kh_hien_huu  = int(last_df["Số đơn có hiệu lực"].sum())
+    ty_le_huy    = tong_huy / (tong_cap_moi + tong_tai_tuc) if (tong_cap_moi + tong_tai_tuc) > 0 else 0
+    ty_le_tai_tuc = tong_tai_tuc / tong_tai_tuc_dk if tong_tai_tuc_dk > 0 else 0
 
     # ── Deltas vs previous day ────────────────────────────────────────────────
     delta_tien    = last_df["Tiền thực thu"].sum()
@@ -126,6 +130,12 @@ def render_isafe_page():
     last_ty_le = last_df["Số đơn hủy webview"].sum() / last_denom if last_denom > 0 else 0
     delta_ty_le = last_ty_le - prev_ty_le
 
+    last_tai_tuc_dk = last_df["Số đơn tái tục dự kiến"].sum()
+    prev_tai_tuc_dk = prev_df["Số đơn tái tục dự kiến"].sum()
+    last_tt_rate = last_df["Số đơn cấp tái tục"].sum() / last_tai_tuc_dk if last_tai_tuc_dk > 0 else 0
+    prev_tt_rate = prev_df["Số đơn cấp tái tục"].sum() / prev_tai_tuc_dk if prev_tai_tuc_dk > 0 else 0
+    delta_tai_tuc = last_tt_rate - prev_tt_rate
+
     # ── YoY: cùng kỳ năm trước ───────────────────────────────────────────────
     current_year = int(last_date.year)
     prev_year    = current_year - 1
@@ -138,8 +148,13 @@ def render_isafe_page():
         (isafe_full_df["Năm"] == prev_year) &
         (isafe_full_df["Ngày phát sinh"] <= yoy_cutoff)
     ]
-    yoy_tien    = yoy_df["Tiền thực thu"].sum()
-    yoy_cap_moi = int(yoy_df["Số đơn cấp mới"].sum())
+    yoy_tien         = yoy_df["Tiền thực thu"].sum()
+    yoy_cap_moi      = int(yoy_df["Số đơn cấp mới"].sum())
+    yoy_tai_tuc_dk   = yoy_df["Số đơn tái tục dự kiến"].sum()
+    yoy_ty_le_tai_tuc = (
+        yoy_df["Số đơn cấp tái tục"].sum() / yoy_tai_tuc_dk
+        if yoy_tai_tuc_dk > 0 else 0
+    )
 
     # KH hiện hữu YoY: stock value at the equivalent date in prev_year
     yoy_last_date = yoy_df["Ngày phát sinh"].max() if not yoy_df.empty else None
@@ -166,7 +181,7 @@ def render_isafe_page():
         unsafe_allow_html=True,
     )
 
-    cols = st.columns(4)
+    cols = st.columns(5)
 
     with cols[0]:
         _ds = "+" if delta_tien >= 0 else ""
@@ -210,6 +225,17 @@ def render_isafe_page():
             delta_str=f"{delta_ty_le:+.2%}",
             delta_color=_huy_color,
             accent_color="#d71149",
+        ), unsafe_allow_html=True)
+
+    with cols[4]:
+        _tt_color = "#2e7d32" if delta_tai_tuc >= 0 else "#c62828"
+        st.markdown(_kpi_card(
+            label="Tỷ lệ tái tục / dự kiến",
+            value=f"{ty_le_tai_tuc:.1%}",
+            delta_str=f"{delta_tai_tuc:+.2%}",
+            delta_color=_tt_color,
+            accent_color="#2C7B6F",
+            yoy_html=_yoy_caption(ty_le_tai_tuc, yoy_ty_le_tai_tuc, lambda v: f"{v:.1%}"),
         ), unsafe_allow_html=True)
 
 
