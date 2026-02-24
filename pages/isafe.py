@@ -309,7 +309,7 @@ def render_isafe_page():
     _kh_active    = float(last_df["Số đơn có hiệu lực"].sum())
     _kh_tam_nguong = float(last_df["Số đơn tạm ngưng"].sum())
     _pie_df = pd.DataFrame({
-        "Loại KH": ["Đang hoạt động", "Tạm ngưng"],
+        "Loại KH": ["Có hiệu lực", "Tạm ngưng"],
         "Số đơn": [_kh_active, _kh_tam_nguong],
     })
 
@@ -317,63 +317,113 @@ def render_isafe_page():
 
     with chart_cols[0]:
         st.markdown(
-            '<p style="font-size:0.89rem;font-weight:600;color:rgb(49,51,63);margin:0 0 4px 0;">'
+            '<p style="font-size:0.89rem;font-weight:600;color:rgb(49,51,63);margin:0 0 0.28rem 0;">'
             'KH hiện hữu</p>',
+            unsafe_allow_html=True,
+        )
+        # Custom legend row (matches overview style)
+        st.markdown(
+            '<div style="display:flex;gap:14px;margin-bottom:6px;font-size:0.57rem;">'
+            '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;'
+            'background:#6b3fa0;margin-right:4px;vertical-align:middle;"></span>Có hiệu lực</span>'
+            '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;'
+            'background:#b39ddb;margin-right:4px;vertical-align:middle;"></span>Tạm ngưng</span>'
+            '</div>',
             unsafe_allow_html=True,
         )
         _pie = (
             alt.Chart(_pie_df)
-            .mark_arc(innerRadius=55)
+            .mark_arc(innerRadius=42)
             .encode(
                 theta=alt.Theta("Số đơn:Q"),
                 color=alt.Color(
                     "Loại KH:N",
                     scale=alt.Scale(
-                        domain=["Đang hoạt động", "Tạm ngưng"],
-                        range=["#2C4C7B", "#d71149"],
+                        domain=["Có hiệu lực", "Tạm ngưng"],
+                        range=["#6b3fa0", "#b39ddb"],
                     ),
-                    legend=alt.Legend(orient="bottom", labelFontSize=11),
+                    legend=None,
                 ),
                 tooltip=[
                     alt.Tooltip("Loại KH:N", title="Loại"),
-                    alt.Tooltip("Số đơn:Q", title="Số đơn", format=","),
+                    alt.Tooltip("Số đơn:Q", title="Số đơn", format=",.0f"),
                 ],
             )
-            .properties(height=280)
+            .properties(height=185)
         )
-        st.altair_chart(_pie, use_container_width=True)
+        st.altair_chart(_pie, width='stretch')
+        _kh_total = _kh_active + _kh_tam_nguong
+        _kh_total_str = (
+            f"{_kh_total / 1e6:.3f} triệu" if _kh_total >= 1_000_000 else f"{int(_kh_total):,}"
+        )
+        _pct_hieu_luc = _kh_active / _kh_total if _kh_total > 0 else 0
+        st.markdown(
+            f'<div style="text-align:center;font-size:0.60rem;color:#444;margin-top:-6px;">'
+            f'Tổng KH hiện hữu<br>'
+            f'<strong style="font-size:0.70rem;color:#1a1a2e;">{_kh_total_str}</strong>'
+            f'</div>'
+            f'<div style="text-align:center;font-size:0.57rem;color:#6b3fa0;margin-top:3px;">'
+            f'Có hiệu lực: <strong>{_pct_hieu_luc:.1%}</strong>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
     with chart_cols[1]:
         st.markdown(
-            '<p style="font-size:0.89rem;font-weight:600;color:rgb(49,51,63);margin:0 0 4px 0;">'
+            '<p style="font-size:0.89rem;font-weight:600;color:rgb(49,51,63);margin:0 0 0.28rem 0;">'
             'Tiền thực thu vs dự kiến theo tháng</p>',
             unsafe_allow_html=True,
         )
         if not _melted.empty:
+            _melted["label"] = _melted["Tiền (VND)"].apply(_fmt_currency)
+            _bar_order = ["Thực thu", "Dự kiến"]
             _bars = (
                 alt.Chart(_melted)
                 .mark_bar()
                 .encode(
-                    x=alt.X("Tháng:N", title="", axis=alt.Axis(labelAngle=-45)),
-                    y=alt.Y("Tiền (VND):Q", title="VND", axis=alt.Axis(format="~s")),
+                    x=alt.X("Tháng:N", title=None, axis=alt.Axis(labelAngle=0)),
+                    y=alt.Y("Tiền (VND):Q", title=None, axis=None),
                     color=alt.Color(
                         "Loại:N",
                         scale=alt.Scale(
-                            domain=["Thực thu", "Dự kiến"],
-                            range=["#2C4C7B", "#2C7B6F"],
+                            domain=_bar_order,
+                            range=["#2C4C7B", "#6B9ED4"],
                         ),
-                        legend=alt.Legend(orient="bottom", labelFontSize=11),
+                        legend=None,
                     ),
-                    xOffset="Loại:N",
+                    xOffset=alt.XOffset("Loại:N", sort=_bar_order),
                     tooltip=[
                         alt.Tooltip("Tháng:N", title="Tháng"),
                         alt.Tooltip("Loại:N", title="Loại"),
-                        alt.Tooltip("Tiền (VND):Q", title="Tiền (VND)", format=",.0f"),
+                        alt.Tooltip("label:N", title="Tiền"),
                     ],
                 )
-                .properties(height=280)
             )
-            st.altair_chart(_bars, use_container_width=True)
+            _bar_labels = (
+                alt.Chart(_melted[_melted["Tiền (VND)"] > 0])
+                .mark_text(dy=-6, fontSize=11, fontWeight="normal")
+                .encode(
+                    x=alt.X("Tháng:N", sort=None),
+                    y=alt.Y("Tiền (VND):Q"),
+                    xOffset=alt.XOffset("Loại:N", sort=_bar_order),
+                    color=alt.Color(
+                        "Loại:N",
+                        scale=alt.Scale(domain=_bar_order, range=["#2C4C7B", "#6B9ED4"]),
+                    ),
+                    text=alt.Text("label:N"),
+                )
+            )
+            # Custom legend row
+            st.markdown(
+                '<div style="display:flex;gap:14px;margin-bottom:6px;font-size:0.57rem;">'
+                '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;'
+                'background:#2C4C7B;margin-right:4px;vertical-align:middle;"></span>Thực thu</span>'
+                '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;'
+                'background:#6B9ED4;margin-right:4px;vertical-align:middle;"></span>Dự kiến</span>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+            st.altair_chart((_bars + _bar_labels).properties(height=280), width='stretch')
         else:
             st.info("Không có dữ liệu để vẽ biểu đồ.")
 
