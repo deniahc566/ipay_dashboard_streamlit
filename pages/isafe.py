@@ -327,11 +327,12 @@ def render_isafe_page():
 
             tien_30      = _lk(d, "tien",      -30)
             cap_moi_30   = _lk(d, "cap_moi",   -30)
+            huy_30       = _lk(d, "huy",       -30)
             ttdk_5       = _lk(d, "tai_tuc_dk", +5)
 
             so_don     = tien / 5000
             so_don_30  = tien_30 / 5000
-            tien_dk    = cap_moi_30 * ty_le_huy + ttdk * 0.9 - ttdk_5 * 5000 + tien_30 * 0.95
+            tien_dk    = cap_moi_30 * huy_30 + ttdk * 0.9 - ttdk_5 * 5000 + tien_30 * 0.95
             tt_rate    = tai_tuc / ttdk if ttdk > 0 else 0.0
 
             tot_so_don    += so_don
@@ -355,7 +356,7 @@ def render_isafe_page():
                 f'<td style="padding:4px 8px;text-align:right;color:#888;">{tien_30:,.0f}</td>'
                 f'<td style="padding:4px 8px;text-align:right;color:#2C4C7B;">{tien_dk:,.0f}</td>'
                 f'<td style="padding:4px 8px;text-align:right;">'
-                f'{_arrow(huy, _lk(d, "huy", -30), higher_is_good=False)}'
+                f'{_arrow(huy, huy_30, higher_is_good=False)}'
                 f'{int(huy):,}</td>'
                 f'<td style="padding:4px 8px;text-align:right;">{tt_rate:.1%}</td>'
                 f'</tr>'
