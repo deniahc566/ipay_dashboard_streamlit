@@ -271,6 +271,7 @@ def render_isafe_page():
         .groupby("Ngày phát sinh", as_index=False)
         .agg(
             tien=("Tiền thực thu", "sum"),
+            cap_moi=("Số đơn cấp mới", "sum"),
             tai_tuc=("Số đơn cấp tái tục", "sum"),
             tai_tuc_dk=("Số đơn tái tục dự kiến", "sum"),
             huy=("Số đơn hủy webview", "sum"),
@@ -315,12 +316,14 @@ def render_isafe_page():
         # Accumulators for totals
         tot_so_don = tot_so_don_30 = 0.0
         tot_tien = tot_tien_30 = tot_tien_dk = 0.0
-        tot_huy = tot_tai_tuc = tot_tai_tuc_dk = 0.0
+        tot_huy = tot_tai_tuc = tot_tai_tuc_dk = tot_tang_truong = 0.0
 
+        prev_tang_truong = None
         html_rows = []
         for i, r in day_df.iterrows():
             d        = r["Ngày phát sinh"]
             tien     = r["tien"]
+            cap_moi  = r["cap_moi"]
             tai_tuc  = r["tai_tuc"]
             ttdk     = r["tai_tuc_dk"]
             huy      = r["huy"]
@@ -330,20 +333,32 @@ def render_isafe_page():
             huy_30       = _lk(d, "huy",       -30)
             ttdk_5       = _lk(d, "tai_tuc_dk", +5)
 
-            so_don     = tien / 5000
-            so_don_30  = tien_30 / 5000
-            tien_dk    = (cap_moi_30 - huy_30 + ttdk * 0.9 - ttdk_5) * 5000 * 0.95 + tien_30 * 0.95
-            tt_rate    = tai_tuc / ttdk if ttdk > 0 else 0.0
+            so_don      = tien / 5000
+            so_don_30   = tien_30 / 5000
+            tien_dk     = (cap_moi_30 - huy_30 + ttdk * 0.9 - ttdk_5) * 5000 * 0.95 + tien_30 * 0.95
+            tt_rate     = tai_tuc / ttdk if ttdk > 0 else 0.0
+            tang_truong = cap_moi - huy - ttdk + tai_tuc
 
-            tot_so_don    += so_don
-            tot_so_don_30 += so_don_30
-            tot_tien      += tien
-            tot_tien_30   += tien_30
-            tot_tien_dk   += tien_dk
-            tot_huy       += huy
-            tot_tai_tuc   += tai_tuc
+            tot_so_don     += so_don
+            tot_so_don_30  += so_don_30
+            tot_tien       += tien
+            tot_tien_30    += tien_30
+            tot_tien_dk    += tien_dk
+            tot_huy        += huy
+            tot_tai_tuc    += tai_tuc
             tot_tai_tuc_dk += ttdk
+            tot_tang_truong += tang_truong
 
+            # Arrow for tăng trưởng: compare to previous day; colour by sign if no prev
+            if prev_tang_truong is not None:
+                arr_tt = _arrow(tang_truong, prev_tang_truong)
+            else:
+                arr_tt = '<span style="color:#2e7d32">▲&nbsp;</span>' if tang_truong > 0 else (
+                    '<span style="color:#c62828">▼&nbsp;</span>' if tang_truong < 0 else ""
+                )
+            prev_tang_truong = tang_truong
+
+            _tt_val_color = "#2e7d32" if tang_truong >= 0 else "#c62828"
             bg = "#ffffff" if i % 2 == 0 else "#f8f9fa"
             html_rows.append(
                 f'<tr style="background:{bg};">'
@@ -358,6 +373,8 @@ def render_isafe_page():
                 f'<td style="padding:4px 8px;text-align:right;">'
                 f'{_arrow(huy, huy_30, higher_is_good=False)}'
                 f'{int(huy):,}</td>'
+                f'<td style="padding:4px 8px;text-align:right;font-weight:600;color:{_tt_val_color};">'
+                f'{arr_tt}{int(tang_truong):,}</td>'
                 f'<td style="padding:4px 8px;text-align:right;">{tt_rate:.1%}</td>'
                 f'</tr>'
             )
@@ -372,6 +389,7 @@ def render_isafe_page():
             f'<td style="padding:5px 8px;text-align:right;opacity:0.75;">{tot_tien_30:,.0f}</td>'
             f'<td style="padding:5px 8px;text-align:right;">{tot_tien_dk:,.0f}</td>'
             f'<td style="padding:5px 8px;text-align:right;">{int(tot_huy):,}</td>'
+            f'<td style="padding:5px 8px;text-align:right;">{int(tot_tang_truong):,}</td>'
             f'<td style="padding:5px 8px;text-align:right;">{tot_tt_rate:.1%}</td>'
             f'</tr>'
         )
@@ -384,6 +402,7 @@ def render_isafe_page():
             "Tiền TT 30NT",
             "Tiền TT dự kiến",
             "Số đơn hủy",
+            "Số KH tăng trưởng",
             "Tỷ lệ TT / DK",
         ]
         header_html = "".join(
