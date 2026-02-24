@@ -41,7 +41,7 @@ with st.sidebar:
         label_visibility="collapsed",
     )
 
-if page == "Tổng quan hàng ngày":
+if page == "Tổng quan":
     render_overview_page()
 else:
     render_isafe_page()
