@@ -277,8 +277,7 @@ def render_isafe_page():
     if not _daily_all.empty:
         _daily_all = _daily_all.reindex(
             pd.date_range(_daily_all.index.min(), _daily_all.index.max(), freq="D"),
-            fill_value=0.0,
-        )
+        ).fillna(0.0)
         _daily_all["tien_dk"] = (
             (_daily_all["cap_moi"].shift(30).fillna(0)
              - _daily_all["huy"].shift(30).fillna(0)

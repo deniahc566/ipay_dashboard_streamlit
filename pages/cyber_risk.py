@@ -209,7 +209,7 @@ def render_cyber_risk_page():
             value=_fmt_currency(tong_tien),
             delta_str=f"{_ds}{_fmt_currency(delta_tien)}",
             delta_color="#2e7d32",
-            accent_color="#B85C00",
+            accent_color="#2C4C7B",
             yoy_html=_yoy_caption(tong_tien, yoy_tien, _fmt_currency),
         ), unsafe_allow_html=True)
 
@@ -221,7 +221,7 @@ def render_cyber_risk_page():
             value=f"{tong_tang_truong:,}",
             delta_str=f"{_tg_sign}{delta_tang_truong:,}",
             delta_color=_tg_color,
-            accent_color="#7B4A00",
+            accent_color="#6A415E",
             yoy_html=_yoy_caption(tong_tang_truong, yoy_tang_truong, lambda v: f"{int(v):,}"),
             tooltip="Cấp mới − Hủy − Tái tục dự kiến + Tái tục thực tế",
         ), unsafe_allow_html=True)
@@ -234,7 +234,7 @@ def render_cyber_risk_page():
             value=f"{kh_hien_huu:,}",
             delta_str=f"{_kh_sign}{delta_kh:,}",
             delta_color=_kh_color,
-            accent_color="#C47A00",
+            accent_color="#6b3fa0",
             yoy_html=_yoy_caption(kh_hien_huu, yoy_kh, lambda v: f"{int(v):,}"),
         ), unsafe_allow_html=True)
 
@@ -275,8 +275,7 @@ def render_cyber_risk_page():
     if not _daily_all.empty:
         _daily_all = _daily_all.reindex(
             pd.date_range(_daily_all.index.min(), _daily_all.index.max(), freq="D"),
-            fill_value=0.0,
-        )
+        ).fillna(0.0)
         _daily_all["tien_dk"] = (
             (_daily_all["cap_moi"].shift(30).fillna(0)
              - _daily_all["huy"].shift(30).fillna(0)
@@ -321,9 +320,9 @@ def render_cyber_risk_page():
         st.markdown(
             '<div style="display:flex;gap:14px;margin-bottom:6px;font-size:0.57rem;">'
             '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;'
-            'background:#C47A00;margin-right:4px;vertical-align:middle;"></span>Có hiệu lực</span>'
+            'background:#6b3fa0;margin-right:4px;vertical-align:middle;"></span>Có hiệu lực</span>'
             '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;'
-            'background:#F0C060;margin-right:4px;vertical-align:middle;"></span>Tạm ngưng</span>'
+            'background:#b39ddb;margin-right:4px;vertical-align:middle;"></span>Tạm ngưng</span>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -336,7 +335,7 @@ def render_cyber_risk_page():
                     "Loại KH:N",
                     scale=alt.Scale(
                         domain=["Có hiệu lực", "Tạm ngưng"],
-                        range=["#C47A00", "#F0C060"],
+                        range=["#6b3fa0", "#b39ddb"],
                     ),
                     legend=None,
                 ),
@@ -358,7 +357,7 @@ def render_cyber_risk_page():
             f'Tổng KH hiện hữu<br>'
             f'<strong style="font-size:0.70rem;color:#1a1a2e;">{_kh_total_str}</strong>'
             f'</div>'
-            f'<div style="text-align:center;font-size:0.57rem;color:#C47A00;margin-top:3px;">'
+            f'<div style="text-align:center;font-size:0.57rem;color:#6b3fa0;margin-top:3px;">'
             f'Có hiệu lực: <strong>{_pct_hieu_luc:.1%}</strong>'
             f'</div>',
             unsafe_allow_html=True,
@@ -383,7 +382,7 @@ def render_cyber_risk_page():
                         "Loại:N",
                         scale=alt.Scale(
                             domain=_bar_order,
-                            range=["#B85C00", "#E8A055"],
+                            range=["#2C4C7B", "#6B9ED4"],
                         ),
                         legend=None,
                     ),
@@ -404,7 +403,7 @@ def render_cyber_risk_page():
                     xOffset=alt.XOffset("Loại:N", sort=_bar_order),
                     color=alt.Color(
                         "Loại:N",
-                        scale=alt.Scale(domain=_bar_order, range=["#B85C00", "#E8A055"]),
+                        scale=alt.Scale(domain=_bar_order, range=["#2C4C7B", "#6B9ED4"]),
                     ),
                     text=alt.Text("label:N"),
                 )
@@ -412,9 +411,9 @@ def render_cyber_risk_page():
             st.markdown(
                 '<div style="display:flex;gap:14px;margin-bottom:6px;font-size:0.57rem;">'
                 '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;'
-                'background:#B85C00;margin-right:4px;vertical-align:middle;"></span>Thực thu</span>'
+                'background:#2C4C7B;margin-right:4px;vertical-align:middle;"></span>Thực thu</span>'
                 '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;'
-                'background:#E8A055;margin-right:4px;vertical-align:middle;"></span>Dự kiến</span>'
+                'background:#6B9ED4;margin-right:4px;vertical-align:middle;"></span>Dự kiến</span>'
                 '</div>',
                 unsafe_allow_html=True,
             )
@@ -682,7 +681,7 @@ def render_cyber_risk_page():
                 f'<td style="padding:4px 8px;text-align:right;">'
                 f'{_arrow(tien, tien_30)}{tien:,.0f}</td>'
                 f'<td style="padding:4px 8px;text-align:right;color:#888;">{tien_30:,.0f}</td>'
-                f'<td style="padding:4px 8px;text-align:right;color:#B85C00;">{tien_dk:,.0f}</td>'
+                f'<td style="padding:4px 8px;text-align:right;color:#2C4C7B;">{tien_dk:,.0f}</td>'
                 f'<td style="padding:4px 8px;text-align:right;">'
                 f'{_arrow(cap_moi, cap_moi_30)}{int(cap_moi):,}</td>'
                 f'<td style="padding:4px 8px;text-align:right;color:#888;">{int(cap_moi_30):,}</td>'
@@ -697,7 +696,7 @@ def render_cyber_risk_page():
 
         tot_tt_rate = tot_tai_tuc / tot_tai_tuc_dk if tot_tai_tuc_dk > 0 else 0.0
         total_row = (
-            f'<tr style="background:#B85C00;color:white;font-weight:600;">'
+            f'<tr style="background:#2C4C7B;color:white;font-weight:600;">'
             f'<td style="padding:5px 8px;">Tổng</td>'
             f'<td style="padding:5px 8px;text-align:right;">{int(round(tot_so_don)):,}</td>'
             f'<td style="padding:5px 8px;text-align:right;opacity:0.75;">{int(round(tot_so_don_30)):,}</td>'
@@ -733,7 +732,7 @@ def render_cyber_risk_page():
         st.markdown(
             f'<div style="overflow-x:auto;margin-top:4px;">'
             f'<table style="width:100%;border-collapse:collapse;font-size:0.75rem;">'
-            f'<thead><tr style="background:#B85C00;color:white;">{header_html}</tr></thead>'
+            f'<thead><tr style="background:#2C4C7B;color:white;">{header_html}</tr></thead>'
             f'<tbody>{"".join(html_rows)}</tbody>'
             f'<tfoot>{total_row}</tfoot>'
             f'</table></div>',
