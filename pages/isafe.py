@@ -516,9 +516,9 @@ def render_isafe_page():
                 '</div>',
                 unsafe_allow_html=True,
             )
-            _tt_lines = (
+            _tt_bars = (
                 alt.Chart(_melted_tt)
-                .mark_line(strokeWidth=2.5, point=alt.OverlayMarkDef(size=60))
+                .mark_bar()
                 .encode(
                     x=alt.X("Tháng:N", title=None, axis=alt.Axis(labelAngle=0)),
                     y=alt.Y("Số đơn:Q", title=None, axis=None),
@@ -527,6 +527,7 @@ def render_isafe_page():
                         scale=alt.Scale(domain=_tt_order, range=["#2C7B6F", "#6DB4AC"]),
                         legend=None,
                     ),
+                    xOffset=alt.XOffset("Loại:N", sort=_tt_order),
                     tooltip=[
                         alt.Tooltip("Tháng:N", title="Tháng"),
                         alt.Tooltip("Loại:N", title="Loại"),
@@ -536,10 +537,11 @@ def render_isafe_page():
             )
             _tt_labels = (
                 alt.Chart(_melted_tt[_melted_tt["Số đơn"] > 0])
-                .mark_text(dy=-12, fontSize=11, fontWeight="normal")
+                .mark_text(dy=-6, fontSize=11, fontWeight="normal")
                 .encode(
                     x=alt.X("Tháng:N", sort=None),
                     y=alt.Y("Số đơn:Q"),
+                    xOffset=alt.XOffset("Loại:N", sort=_tt_order),
                     color=alt.Color(
                         "Loại:N",
                         scale=alt.Scale(domain=_tt_order, range=["#2C7B6F", "#6DB4AC"]),
@@ -548,7 +550,7 @@ def render_isafe_page():
                 )
             )
             st.altair_chart(
-                (_tt_lines + _tt_labels).properties(height=220),
+                (_tt_bars + _tt_labels).properties(height=220),
                 width='stretch',
             )
         else:
