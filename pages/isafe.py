@@ -332,7 +332,7 @@ def render_isafe_page():
 
             so_don     = tien / 5000
             so_don_30  = tien_30 / 5000
-            tien_dk    = cap_moi_30 * huy_30 + ttdk * 0.9 - ttdk_5 * 5000 + tien_30 * 0.95
+            tien_dk    = (cap_moi_30 - huy_30 + ttdk * 0.9 - ttdk_5) * 5000 * 0.95 + tien_30 * 0.95
             tt_rate    = tai_tuc / ttdk if ttdk > 0 else 0.0
 
             tot_so_don    += so_don
