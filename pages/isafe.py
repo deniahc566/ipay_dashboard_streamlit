@@ -2,6 +2,7 @@ import os
 import streamlit as st
 import duckdb
 import pandas as pd
+import altair as alt
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -258,6 +259,123 @@ def render_isafe_page():
             accent_color="#2C7B6F",
             yoy_html=_yoy_caption(ty_le_tai_tuc, yoy_ty_le_tai_tuc, lambda v: f"{v:.1%}"),
         ), unsafe_allow_html=True)
+
+    # ── Row 2: Charts ─────────────────────────────────────────────────────────
+    st.markdown('<div style="margin-top:24px;"></div>', unsafe_allow_html=True)
+
+    # Vectorized daily tien_dk for bar chart (uses full isafe time series for shifts)
+    _daily_all = (
+        isafe_full_df.groupby("Ngày phát sinh")
+        .agg(
+            tien=("Tiền thực thu", "sum"),
+            cap_moi=("Số đơn cấp mới", "sum"),
+            tai_tuc_dk=("Số đơn tái tục dự kiến", "sum"),
+            huy=("Số đơn hủy webview", "sum"),
+        )
+        .sort_index()
+    )
+    if not _daily_all.empty:
+        _daily_all = _daily_all.reindex(
+            pd.date_range(_daily_all.index.min(), _daily_all.index.max(), freq="D"),
+            fill_value=0.0,
+        )
+        _daily_all["tien_dk"] = (
+            (_daily_all["cap_moi"].shift(30).fillna(0)
+             - _daily_all["huy"].shift(30).fillna(0)
+             + _daily_all["tai_tuc_dk"] * 0.9
+             - _daily_all["tai_tuc_dk"].shift(-5).fillna(0))
+            * 5000 * 0.95
+            + _daily_all["tien"].shift(30).fillna(0) * 0.95
+        )
+        _yr_filter = selected_years if selected_years else all_years
+        _daily_chart = _daily_all[_daily_all.index.year.isin(_yr_filter)].copy()
+        _daily_chart["Tháng"] = _daily_chart.index.to_period("M").astype(str)
+        _monthly = (
+            _daily_chart.groupby("Tháng")[["tien", "tien_dk"]]
+            .sum()
+            .reset_index()
+            .rename(columns={"tien": "Thực thu", "tien_dk": "Dự kiến"})
+        )
+        _melted = _monthly.melt(
+            id_vars="Tháng",
+            value_vars=["Thực thu", "Dự kiến"],
+            var_name="Loại",
+            value_name="Tiền (VND)",
+        )
+    else:
+        _melted = pd.DataFrame(columns=["Tháng", "Loại", "Tiền (VND)"])
+
+    # Pie chart data
+    _kh_active    = float(last_df["Số đơn có hiệu lực"].sum())
+    _kh_tam_nguong = float(last_df["Số đơn tạm ngưng"].sum())
+    _pie_df = pd.DataFrame({
+        "Loại KH": ["Đang hoạt động", "Tạm ngưng"],
+        "Số đơn": [_kh_active, _kh_tam_nguong],
+    })
+
+    chart_cols = st.columns([1, 2])
+
+    with chart_cols[0]:
+        st.markdown(
+            '<p style="font-size:0.89rem;font-weight:600;color:rgb(49,51,63);margin:0 0 4px 0;">'
+            'KH hiện hữu</p>',
+            unsafe_allow_html=True,
+        )
+        _pie = (
+            alt.Chart(_pie_df)
+            .mark_arc(innerRadius=55)
+            .encode(
+                theta=alt.Theta("Số đơn:Q"),
+                color=alt.Color(
+                    "Loại KH:N",
+                    scale=alt.Scale(
+                        domain=["Đang hoạt động", "Tạm ngưng"],
+                        range=["#2C4C7B", "#d71149"],
+                    ),
+                    legend=alt.Legend(orient="bottom", labelFontSize=11),
+                ),
+                tooltip=[
+                    alt.Tooltip("Loại KH:N", title="Loại"),
+                    alt.Tooltip("Số đơn:Q", title="Số đơn", format=","),
+                ],
+            )
+            .properties(height=280)
+        )
+        st.altair_chart(_pie, use_container_width=True)
+
+    with chart_cols[1]:
+        st.markdown(
+            '<p style="font-size:0.89rem;font-weight:600;color:rgb(49,51,63);margin:0 0 4px 0;">'
+            'Tiền thực thu vs dự kiến theo tháng</p>',
+            unsafe_allow_html=True,
+        )
+        if not _melted.empty:
+            _bars = (
+                alt.Chart(_melted)
+                .mark_bar()
+                .encode(
+                    x=alt.X("Tháng:N", title="", axis=alt.Axis(labelAngle=-45)),
+                    y=alt.Y("Tiền (VND):Q", title="VND", axis=alt.Axis(format="~s")),
+                    color=alt.Color(
+                        "Loại:N",
+                        scale=alt.Scale(
+                            domain=["Thực thu", "Dự kiến"],
+                            range=["#2C4C7B", "#2C7B6F"],
+                        ),
+                        legend=alt.Legend(orient="bottom", labelFontSize=11),
+                    ),
+                    xOffset="Loại:N",
+                    tooltip=[
+                        alt.Tooltip("Tháng:N", title="Tháng"),
+                        alt.Tooltip("Loại:N", title="Loại"),
+                        alt.Tooltip("Tiền (VND):Q", title="Tiền (VND)", format=",.0f"),
+                    ],
+                )
+                .properties(height=280)
+            )
+            st.altair_chart(_bars, use_container_width=True)
+        else:
+            st.info("Không có dữ liệu để vẽ biểu đồ.")
 
     # ── Daily detail table ────────────────────────────────────────────────────
     st.markdown('<div style="margin-top:28px;"></div>', unsafe_allow_html=True)
