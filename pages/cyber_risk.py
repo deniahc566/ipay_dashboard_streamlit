@@ -594,6 +594,16 @@ def render_cyber_risk_page():
     if day_df.empty:
         st.info("Không có dữ liệu cho tháng/năm đã chọn.")
     else:
+        _month_start = pd.Timestamp(tbl_year, tbl_month, 1)
+        _full_dates = pd.date_range(
+            _month_start, periods=_month_start.days_in_month, freq="D", name="Ngày phát sinh"
+        )
+        day_df = (
+            day_df.set_index("Ngày phát sinh")
+            .reindex(_full_dates)
+            .fillna(0.0)
+            .reset_index()
+        )
         _lkmap = (
             prod_full_df
             .groupby("Ngày phát sinh")
