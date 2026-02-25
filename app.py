@@ -59,6 +59,8 @@ if not st.session_state.authenticated:
 
         /* ── Login card ── */
         [data-testid="stForm"] {{
+            position: relative !important;
+            z-index: 10 !important;
             width: 611px !important;
             background: linear-gradient(180deg, #C7F0FE 0%, #FEFEFE 62.78%) !important;
             box-shadow: 0 4px 10px 1px rgba(0, 0, 0, 0.15) !important;
