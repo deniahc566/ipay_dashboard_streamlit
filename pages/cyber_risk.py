@@ -284,7 +284,7 @@ def render_cyber_risk_page():
             * _PHI_DON * 0.95
             + _daily_all["tien"].shift(30).fillna(0) * 0.95
         )
-        _latest = _daily_all.index.max()
+        _latest = min(_daily_all.index.max(), pd.Timestamp.now().normalize())
         _cutoff_dt = (_latest - pd.DateOffset(months=11)).replace(day=1)
         _daily_chart = _daily_all[_daily_all.index >= _cutoff_dt].copy()
         _daily_chart["Tháng"] = _daily_chart.index.to_period("M").astype(str)
@@ -539,80 +539,77 @@ def render_cyber_risk_page():
 
     # ── Row 4: Tái tục thực tế vs dự kiến theo tháng ─────────────────────────
     st.markdown('<div style="margin-top:24px;"></div>', unsafe_allow_html=True)
-    tt_cols = st.columns(2)
-
-    with tt_cols[0]:
+    st.markdown(
+        '<p style="font-size:0.89rem;font-weight:600;color:rgb(49,51,63);margin:0 0 0.28rem 0;">'
+        'Tái tục thực tế vs dự kiến theo tháng</p>',
+        unsafe_allow_html=True,
+    )
+    _tt_src = prod_full_df[prod_full_df["Ngày phát sinh"] >= _cutoff_dt] if _cutoff_dt is not None else prod_full_df
+    _monthly_tt = (
+        _tt_src.assign(Tháng=_tt_src["Ngày phát sinh"].dt.to_period("M").astype(str))
+        .groupby("Tháng", as_index=False)
+        .agg(
+            tai_tuc=("Số đơn cấp tái tục", "sum"),
+            tai_tuc_dk=("Số đơn tái tục dự kiến", "sum"),
+        )
+    )
+    _tt_order = ["Thực tế", "Dự kiến"]
+    _melted_tt = _monthly_tt.melt(
+        id_vars="Tháng",
+        value_vars=["tai_tuc", "tai_tuc_dk"],
+        var_name="Loại_raw",
+        value_name="Số đơn",
+    ).assign(
+        Loại=lambda x: x["Loại_raw"].map({"tai_tuc": "Thực tế", "tai_tuc_dk": "Dự kiến"})
+    )
+    _melted_tt["label"] = _melted_tt["Số đơn"].apply(lambda v: f"{int(v):,}")
+    if not _melted_tt.empty:
         st.markdown(
-            '<p style="font-size:0.89rem;font-weight:600;color:rgb(49,51,63);margin:0 0 0.28rem 0;">'
-            'Tái tục thực tế vs dự kiến theo tháng</p>',
+            '<div style="display:flex;gap:14px;margin-bottom:6px;font-size:0.57rem;">'
+            '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;'
+            'background:#2C7B6F;margin-right:4px;vertical-align:middle;"></span>Thực tế</span>'
+            '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;'
+            'background:#6DB4AC;margin-right:4px;vertical-align:middle;"></span>Dự kiến</span>'
+            '</div>',
             unsafe_allow_html=True,
         )
-        _tt_src = prod_full_df[prod_full_df["Ngày phát sinh"] >= _cutoff_dt] if _cutoff_dt is not None else prod_full_df
-        _monthly_tt = (
-            _tt_src.assign(Tháng=_tt_src["Ngày phát sinh"].dt.to_period("M").astype(str))
-            .groupby("Tháng", as_index=False)
-            .agg(
-                tai_tuc=("Số đơn cấp tái tục", "sum"),
-                tai_tuc_dk=("Số đơn tái tục dự kiến", "sum"),
+        _tt_bars = (
+            alt.Chart(_melted_tt)
+            .mark_bar()
+            .encode(
+                x=alt.X("Tháng:N", title=None, axis=alt.Axis(labelAngle=0)),
+                y=alt.Y("Số đơn:Q", title=None, axis=None),
+                color=alt.Color(
+                    "Loại:N",
+                    scale=alt.Scale(domain=_tt_order, range=["#2C7B6F", "#6DB4AC"]),
+                    legend=None,
+                ),
+                xOffset=alt.XOffset("Loại:N", sort=_tt_order),
+                tooltip=[
+                    alt.Tooltip("Tháng:N", title="Tháng"),
+                    alt.Tooltip("Loại:N", title="Loại"),
+                    alt.Tooltip("label:N", title="Số đơn"),
+                ],
             )
         )
-        _tt_order = ["Thực tế", "Dự kiến"]
-        _melted_tt = _monthly_tt.melt(
-            id_vars="Tháng",
-            value_vars=["tai_tuc", "tai_tuc_dk"],
-            var_name="Loại_raw",
-            value_name="Số đơn",
-        ).assign(
-            Loại=lambda x: x["Loại_raw"].map({"tai_tuc": "Thực tế", "tai_tuc_dk": "Dự kiến"})
+        _tt_labels = (
+            alt.Chart(_melted_tt[_melted_tt["Số đơn"] > 0])
+            .mark_text(dy=-6, fontSize=11, fontWeight="normal")
+            .encode(
+                x=alt.X("Tháng:N", sort=None),
+                y=alt.Y("Số đơn:Q"),
+                xOffset=alt.XOffset("Loại:N", sort=_tt_order),
+                color=alt.Color(
+                    "Loại:N",
+                    scale=alt.Scale(domain=_tt_order, range=["#2C7B6F", "#6DB4AC"]),
+                ),
+                text=alt.Text("label:N"),
+            )
         )
-        _melted_tt["label"] = _melted_tt["Số đơn"].apply(lambda v: f"{int(v):,}")
-        if not _melted_tt.empty:
-            st.markdown(
-                '<div style="display:flex;gap:14px;margin-bottom:6px;font-size:0.57rem;">'
-                '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;'
-                'background:#2C7B6F;margin-right:4px;vertical-align:middle;"></span>Thực tế</span>'
-                '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;'
-                'background:#6DB4AC;margin-right:4px;vertical-align:middle;"></span>Dự kiến</span>'
-                '</div>',
-                unsafe_allow_html=True,
-            )
-            _tt_bars = (
-                alt.Chart(_melted_tt)
-                .mark_bar()
-                .encode(
-                    x=alt.X("Tháng:N", title=None, axis=alt.Axis(labelAngle=0)),
-                    y=alt.Y("Số đơn:Q", title=None, axis=None),
-                    color=alt.Color(
-                        "Loại:N",
-                        scale=alt.Scale(domain=_tt_order, range=["#2C7B6F", "#6DB4AC"]),
-                        legend=None,
-                    ),
-                    xOffset=alt.XOffset("Loại:N", sort=_tt_order),
-                    tooltip=[
-                        alt.Tooltip("Tháng:N", title="Tháng"),
-                        alt.Tooltip("Loại:N", title="Loại"),
-                        alt.Tooltip("label:N", title="Số đơn"),
-                    ],
-                )
-            )
-            _tt_labels = (
-                alt.Chart(_melted_tt[_melted_tt["Số đơn"] > 0])
-                .mark_text(dy=-6, fontSize=11, fontWeight="normal")
-                .encode(
-                    x=alt.X("Tháng:N", sort=None),
-                    y=alt.Y("Số đơn:Q"),
-                    xOffset=alt.XOffset("Loại:N", sort=_tt_order),
-                    color=alt.Color(
-                        "Loại:N",
-                        scale=alt.Scale(domain=_tt_order, range=["#2C7B6F", "#6DB4AC"]),
-                    ),
-                    text=alt.Text("label:N"),
-                )
-            )
-            st.altair_chart(
-                (_tt_bars + _tt_labels).properties(height=220),
-                width='stretch',
-            )
+        st.altair_chart(
+            (_tt_bars + _tt_labels).properties(height=220),
+            width='stretch',
+        )
 
     # ── Daily detail table ────────────────────────────────────────────────────
     st.markdown('<div style="margin-top:28px;"></div>', unsafe_allow_html=True)
