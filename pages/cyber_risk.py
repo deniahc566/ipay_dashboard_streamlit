@@ -420,9 +420,9 @@ def render_cyber_risk_page():
             )
             st.altair_chart((_bars + _bar_labels).properties(height=280), width='stretch')
 
-    # ── Row 3: Tỷ lệ hủy & tái tục theo tháng ────────────────────────────────
+    # ── Row 3: Tỷ lệ hủy, KH tăng trưởng & tái tục theo tháng ───────────────
     st.markdown('<div style="margin-top:24px;"></div>', unsafe_allow_html=True)
-    rate_cols = st.columns(2)
+    rate_cols = st.columns(3)
 
     with rate_cols[0]:
         st.markdown(
@@ -475,6 +475,69 @@ def render_cyber_risk_page():
             )
 
     with rate_cols[1]:
+        st.markdown(
+            '<p style="font-size:0.89rem;font-weight:600;color:rgb(49,51,63);margin:0 0 0.28rem 0;">'
+            'KH tăng trưởng theo tháng</p>',
+            unsafe_allow_html=True,
+        )
+        _tg_src = prod_full_df[prod_full_df["Ngày phát sinh"] >= _cutoff_dt] if _cutoff_dt is not None else prod_full_df
+        _monthly_tg = (
+            _tg_src.assign(Tháng=_tg_src["Ngày phát sinh"].dt.to_period("M").astype(str))
+            .groupby("Tháng", as_index=False)
+            .agg(
+                cap_moi=("Số đơn cấp mới", "sum"),
+                huy=("Số đơn hủy webview", "sum"),
+                tai_tuc=("Số đơn cấp tái tục", "sum"),
+                tai_tuc_dk=("Số đơn tái tục dự kiến", "sum"),
+            )
+        )
+        _monthly_tg["KH tăng trưởng"] = (
+            _monthly_tg["cap_moi"] - _monthly_tg["huy"]
+            - _monthly_tg["tai_tuc_dk"] + _monthly_tg["tai_tuc"]
+        )
+        _monthly_tg["label"] = _monthly_tg["KH tăng trưởng"].apply(lambda v: f"{int(v):,}")
+        if not _monthly_tg.empty:
+            _tg_bars = (
+                alt.Chart(_monthly_tg)
+                .mark_bar()
+                .encode(
+                    x=alt.X("Tháng:N", title=None, axis=alt.Axis(labelAngle=0)),
+                    y=alt.Y("KH tăng trưởng:Q", title=None, axis=None),
+                    color=alt.condition(
+                        alt.datum["KH tăng trưởng"] >= 0,
+                        alt.value("#6A415E"),
+                        alt.value("#e57373"),
+                    ),
+                    tooltip=[
+                        alt.Tooltip("Tháng:N", title="Tháng"),
+                        alt.Tooltip("label:N", title="KH tăng trưởng"),
+                    ],
+                )
+            )
+            _tg_labels_pos = (
+                alt.Chart(_monthly_tg[_monthly_tg["KH tăng trưởng"] >= 0])
+                .mark_text(dy=-8, fontSize=11, fontWeight="normal", color="#6A415E")
+                .encode(
+                    x=alt.X("Tháng:N", sort=None),
+                    y=alt.Y("KH tăng trưởng:Q"),
+                    text=alt.Text("label:N"),
+                )
+            )
+            _tg_labels_neg = (
+                alt.Chart(_monthly_tg[_monthly_tg["KH tăng trưởng"] < 0])
+                .mark_text(dy=10, fontSize=11, fontWeight="normal", color="#e57373")
+                .encode(
+                    x=alt.X("Tháng:N", sort=None),
+                    y=alt.Y("KH tăng trưởng:Q"),
+                    text=alt.Text("label:N"),
+                )
+            )
+            st.altair_chart(
+                (_tg_bars + _tg_labels_pos + _tg_labels_neg).properties(height=220),
+                width='stretch',
+            )
+
+    with rate_cols[2]:
         st.markdown(
             '<p style="font-size:0.89rem;font-weight:600;color:rgb(49,51,63);margin:0 0 0.28rem 0;">'
             'Tái tục thực tế vs dự kiến theo tháng</p>',
