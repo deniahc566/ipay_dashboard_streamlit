@@ -54,28 +54,28 @@ def _render_login_page() -> None:
 [data-testid="stDecoration"] {{ display: none !important; }}
 
 /* ── Full-page background ── */
-body, [data-testid="stAppViewContainer"] {{
+body, [data-testid="stAppViewContainer"],
+[data-testid="stAppViewContainer"] > .main,
+section.main {{
     background: linear-gradient(180deg, #83CCF1 0%, #F2F4F8 70.9%) !important;
-}}
-[data-testid="stAppViewContainer"] > .main {{
-    background: transparent !important;
     padding: 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    min-height: 100vh !important;
 }}
 
-/* ── Login card ── */
-.block-container {{
+/* ── Login card – fixed transform-centering bypasses Streamlit layout ── */
+.block-container,
+div.block-container,
+[data-testid="stMainBlockContainer"] {{
+    position: fixed !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
     background: linear-gradient(180deg, #C7F0FE 0%, #FEFEFE 62.78%) !important;
     box-shadow: 0 4px 10px 1px rgba(0, 0, 0, 0.15) !important;
     border-radius: 50px !important;
-    max-width: 611px !important;
     width: 611px !important;
+    max-width: 611px !important;
     padding: 73px 88px 95px !important;
-    position: relative;
-    z-index: 10;
+    z-index: 100 !important;
 }}
 
 /* ── Collapse default element gaps inside card ── */
