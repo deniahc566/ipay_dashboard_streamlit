@@ -107,12 +107,11 @@ if not st.session_state.authenticated:
 
         /* ── Login button – 249 px, centered ── */
         [data-testid="stFormSubmitButton"] {{
-            display: flex !important;
-            justify-content: center !important;
-            width: 100% !important;
             margin-top: 71px !important;
         }}
         [data-testid="stFormSubmitButton"] > button {{
+            display: block !important;
+            margin: 0 auto !important;
             width: 249px !important;
             height: 55px !important;
             background: linear-gradient(90deg, #98EEFF 0%, #C6F6FF 100%) !important;
