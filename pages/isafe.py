@@ -729,8 +729,8 @@ def render_isafe_page():
 
         _HEADERS = [
             "Ngày",
-            "Số đơn thu được phí",
-            "Số đơn 30NT",
+            "Số đơn thu phí",
+            "Số đơn thu phí 30NT",
             "Tiền thực thu",
             "Tiền TT 30NT",
             "Tiền TT dự kiến",
