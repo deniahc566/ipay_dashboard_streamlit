@@ -109,6 +109,7 @@ if not st.session_state.authenticated:
         [data-testid="stFormSubmitButton"] {{
             display: flex !important;
             justify-content: center !important;
+            width: 100% !important;
             margin-top: 71px !important;
         }}
         [data-testid="stFormSubmitButton"] > button {{
@@ -159,7 +160,7 @@ if not st.session_state.authenticated:
                 <p style="font-size:28px;font-weight:600;color:#000;margin:0 0 43px;line-height:1.2;">
                     Báo cáo Bảo hiểm VBI kênh IPAY
                 </p>
-                <p style="font-size:15px;font-weight:600;color:#999;margin:0 0 5px;">
+                <p style="font-size:15px;font-weight:600;color:#999;margin:0 0 20px;">
                     Nhập mật khẩu để có thể đăng nhập vào hệ thống
                 </p>
             </div>
