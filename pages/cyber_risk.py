@@ -277,8 +277,7 @@ def render_cyber_risk_page():
             pd.date_range(_daily_all.index.min(), _daily_all.index.max(), freq="D"),
         ).fillna(0.0)
         _daily_all["tien_dk"] = (
-            (_daily_all["cap_moi"].shift(30).fillna(0)
-             - _daily_all["huy"].shift(30).fillna(0)
+            (_daily_all["huy"].shift(30).fillna(0)
              + _daily_all["tai_tuc_dk"] * 0.9
              - _daily_all["tai_tuc_dk"].shift(-5).fillna(0))
             * _PHI_DON * 0.95
@@ -646,7 +645,7 @@ def render_cyber_risk_page():
 
             so_don      = tien / _PHI_DON
             so_don_30   = tien_30 / _PHI_DON
-            tien_dk     = (cap_moi_30 - huy_30 + ttdk * 0.9 - ttdk_5) * _PHI_DON * 0.95 + tien_30 * 0.95
+            tien_dk     = (huy_30 + ttdk * 0.9 - ttdk_5) * _PHI_DON * 0.95 + tien_30 * 0.95
             tt_rate     = tai_tuc / ttdk if ttdk > 0 else 0.0
             tang_truong = cap_moi - huy - ttdk + tai_tuc
 

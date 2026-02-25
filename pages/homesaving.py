@@ -18,6 +18,8 @@ _NUMERIC_COLS = [
 ]
 
 _PROD_CODE = "VTB_HOMESAVING"
+_PROD_CODE_HS15 = "VTB_HS_15"
+_PROD_CODE_HS25 = "VTB_HS_25"
 
 
 @st.cache_data(ttl=300)
@@ -273,12 +275,24 @@ def render_homesaving_page():
         _daily_all = _daily_all.reindex(
             pd.date_range(_daily_all.index.min(), _daily_all.index.max(), freq="D"),
         ).fillna(0.0)
+        _date_idx = _daily_all.index
+
+        def _sub_daily(prod_code):
+            _sub = (
+                full_df[full_df["PROD_CODE"] == prod_code]
+                .groupby("Ngày phát sinh")
+                .agg(cap_moi=("Số đơn cấp mới", "sum"), huy=("Số đơn hủy webview", "sum"))
+                .sort_index()
+            )
+            if _sub.empty:
+                return pd.DataFrame(0.0, index=_date_idx, columns=["cap_moi", "huy"])
+            return _sub.reindex(_date_idx).fillna(0.0)
+
+        _hs15 = _sub_daily(_PROD_CODE_HS15)
+        _hs25 = _sub_daily(_PROD_CODE_HS25)
         _daily_all["tien_dk"] = (
-            (_daily_all["cap_moi"].shift(30).fillna(0)
-             - _daily_all["huy"].shift(30).fillna(0)
-             + _daily_all["tai_tuc_dk"] * 0.9
-             - _daily_all["tai_tuc_dk"].shift(-5).fillna(0))
-            * 5000 * 0.95
+            (_hs15["cap_moi"].shift(30).fillna(0) - _hs15["huy"].shift(30).fillna(0)) * 15000 * 0.95
+            + (_hs25["cap_moi"].shift(30).fillna(0) - _hs25["huy"].shift(30).fillna(0)) * 25000 * 0.95
             + _daily_all["tien"].shift(30).fillna(0) * 0.95
         )
         _yr_filter = selected_years if selected_years else all_years
@@ -603,6 +617,18 @@ def render_homesaving_page():
             )
             .to_dict(orient="index")
         )
+        _lkmap_hs15 = (
+            full_df[full_df["PROD_CODE"] == _PROD_CODE_HS15]
+            .groupby("Ngày phát sinh")
+            .agg(cap_moi=("Số đơn cấp mới", "sum"), huy=("Số đơn hủy webview", "sum"))
+            .to_dict(orient="index")
+        )
+        _lkmap_hs25 = (
+            full_df[full_df["PROD_CODE"] == _PROD_CODE_HS25]
+            .groupby("Ngày phát sinh")
+            .agg(cap_moi=("Số đơn cấp mới", "sum"), huy=("Số đơn hủy webview", "sum"))
+            .to_dict(orient="index")
+        )
 
         def _lk(date, field, offset):
             return float(_lkmap.get(date + pd.Timedelta(days=offset), {}).get(field, 0.0))
@@ -635,12 +661,20 @@ def render_homesaving_page():
             ttdk     = r["tai_tuc_dk"]
             huy      = r["huy"]
 
-            tien_30      = _lk(d, "tien",      -30)
-            cap_moi_30   = _lk(d, "cap_moi",   -30)
-            huy_30       = _lk(d, "huy",       -30)
-            ttdk_5       = _lk(d, "tai_tuc_dk", +5)
+            tien_30      = _lk(d, "tien",  -30)
+            cap_moi_30   = _lk(d, "cap_moi", -30)
+            huy_30       = _lk(d, "huy",   -30)
+            _d30 = d - pd.Timedelta(days=30)
+            cap_moi_hs15_30 = float(_lkmap_hs15.get(_d30, {}).get("cap_moi", 0.0))
+            huy_hs15_30     = float(_lkmap_hs15.get(_d30, {}).get("huy",     0.0))
+            cap_moi_hs25_30 = float(_lkmap_hs25.get(_d30, {}).get("cap_moi", 0.0))
+            huy_hs25_30     = float(_lkmap_hs25.get(_d30, {}).get("huy",     0.0))
 
-            tien_dk     = (cap_moi_30 - huy_30 + ttdk * 0.9 - ttdk_5) * 5000 * 0.95 + tien_30 * 0.95
+            tien_dk = (
+                (cap_moi_hs15_30 - huy_hs15_30) * 15000 * 0.95
+                + (cap_moi_hs25_30 - huy_hs25_30) * 25000 * 0.95
+                + tien_30 * 0.95
+            )
             tt_rate     = tai_tuc / ttdk if ttdk > 0 else 0.0
             tang_truong = cap_moi - huy - ttdk + tai_tuc
 
