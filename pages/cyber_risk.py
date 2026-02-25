@@ -420,9 +420,9 @@ def render_cyber_risk_page():
             )
             st.altair_chart((_bars + _bar_labels).properties(height=280), width='stretch')
 
-    # ── Row 3: Tỷ lệ hủy, KH tăng trưởng & tái tục theo tháng ───────────────
+    # ── Row 3: Tỷ lệ hủy & KH tăng trưởng theo tháng ────────────────────────
     st.markdown('<div style="margin-top:24px;"></div>', unsafe_allow_html=True)
-    rate_cols = st.columns(3)
+    rate_cols = st.columns(2)
 
     with rate_cols[0]:
         st.markdown(
@@ -537,7 +537,11 @@ def render_cyber_risk_page():
                 width='stretch',
             )
 
-    with rate_cols[2]:
+    # ── Row 4: Tái tục thực tế vs dự kiến theo tháng ─────────────────────────
+    st.markdown('<div style="margin-top:24px;"></div>', unsafe_allow_html=True)
+    tt_cols = st.columns(2)
+
+    with tt_cols[0]:
         st.markdown(
             '<p style="font-size:0.89rem;font-weight:600;color:rgb(49,51,63);margin:0 0 0.28rem 0;">'
             'Tái tục thực tế vs dự kiến theo tháng</p>',
