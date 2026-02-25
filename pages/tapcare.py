@@ -270,6 +270,7 @@ def render_tapcare_page():
         )
         .sort_index()
     )
+    _cutoff_dt = None
     if not _daily_all.empty:
         _daily_all = _daily_all.reindex(
             pd.date_range(_daily_all.index.min(), _daily_all.index.max(), freq="D"),
@@ -280,8 +281,9 @@ def render_tapcare_page():
             * _PHI_DON * 0.95
             + _daily_all["tien"].shift(30).fillna(0) * 0.95
         )
-        _yr_filter = selected_years if selected_years else all_years
-        _daily_chart = _daily_all[_daily_all.index.year.isin(_yr_filter)].copy()
+        _latest = _daily_all.index.max()
+        _cutoff_dt = (_latest - pd.DateOffset(months=11)).replace(day=1)
+        _daily_chart = _daily_all[_daily_all.index >= _cutoff_dt].copy()
         _daily_chart["Tháng"] = _daily_chart.index.to_period("M").astype(str)
         _monthly = (
             _daily_chart.groupby("Tháng")[["tien", "tien_dk"]]
@@ -414,8 +416,6 @@ def render_tapcare_page():
                 unsafe_allow_html=True,
             )
             st.altair_chart((_bars + _bar_labels).properties(height=280), width='stretch')
-        else:
-            st.info("Không có dữ liệu để vẽ biểu đồ.")
 
     # ── Row 3: Tỷ lệ hủy & tái tục theo tháng ────────────────────────────────
     st.markdown('<div style="margin-top:24px;"></div>', unsafe_allow_html=True)
@@ -427,8 +427,9 @@ def render_tapcare_page():
             'Tỷ lệ hủy theo tháng</p>',
             unsafe_allow_html=True,
         )
+        _huy_src = prod_full_df[prod_full_df["Ngày phát sinh"] >= _cutoff_dt] if _cutoff_dt is not None else prod_full_df
         _monthly_huy = (
-            df.assign(Tháng=df["Ngày phát sinh"].dt.to_period("M").astype(str))
+            _huy_src.assign(Tháng=_huy_src["Ngày phát sinh"].dt.to_period("M").astype(str))
             .groupby("Tháng", as_index=False)
             .agg(
                 huy=("Số đơn hủy webview", "sum"),
@@ -469,8 +470,6 @@ def render_tapcare_page():
                 (_huy_m_line + _huy_m_labels).properties(height=220),
                 width='stretch',
             )
-        else:
-            st.info("Không có dữ liệu.")
 
     with rate_cols[1]:
         st.markdown(
@@ -478,8 +477,9 @@ def render_tapcare_page():
             'Tái tục thực tế vs dự kiến theo tháng</p>',
             unsafe_allow_html=True,
         )
+        _tt_src = prod_full_df[prod_full_df["Ngày phát sinh"] >= _cutoff_dt] if _cutoff_dt is not None else prod_full_df
         _monthly_tt = (
-            df.assign(Tháng=df["Ngày phát sinh"].dt.to_period("M").astype(str))
+            _tt_src.assign(Tháng=_tt_src["Ngày phát sinh"].dt.to_period("M").astype(str))
             .groupby("Tháng", as_index=False)
             .agg(
                 tai_tuc=("Số đơn cấp tái tục", "sum"),
@@ -543,8 +543,6 @@ def render_tapcare_page():
                 (_tt_bars + _tt_labels).properties(height=220),
                 width='stretch',
             )
-        else:
-            st.info("Không có dữ liệu.")
 
     # ── Daily detail table ────────────────────────────────────────────────────
     st.markdown('<div style="margin-top:28px;"></div>', unsafe_allow_html=True)
