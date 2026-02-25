@@ -40,7 +40,7 @@ if not st.session_state.authenticated:
 with st.sidebar:
     page = st.radio(
         "Chọn dashboard",
-        options=["Tổng quan", "Cyber Risk", "ISAFE", "TapCare", "Nhà và bạn"],
+        options=["Tổng quan", "Cyber Risk", "I-Safe", "TapCare", "Nhà và bạn"],
         label_visibility="collapsed",
     )
 
@@ -48,7 +48,7 @@ if page == "Tổng quan":
     render_overview_page()
 elif page == "Cyber Risk":
     render_cyber_risk_page()
-elif page == "ISAFE":
+elif page == "I-Safe":
     render_isafe_page()
 elif page == "TapCare":
     render_tapcare_page()
