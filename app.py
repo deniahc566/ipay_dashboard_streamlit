@@ -23,7 +23,7 @@ st.set_page_config(
 # Always-on: only hide chrome shared across all pages
 st.markdown(
     "<style>[data-testid='stSidebarNav']{display:none;}"
-    "#MainMenu,header,footer{visibility:hidden;}</style>",
+    "#MainMenu,footer{visibility:hidden;}</style>",
     unsafe_allow_html=True,
 )
 
@@ -105,15 +105,14 @@ if not st.session_state.authenticated:
             color: #000 !important;
         }}
 
-        /* ── Login button – 249 px, centered ── */
+        /* ── Login button ── */
         [data-testid="stFormSubmitButton"] {{
             margin-top: 71px !important;
         }}
         [data-testid="stFormSubmitButton"] > button {{
-            display: block !important;
-            margin: 0 auto !important;
-            width: 249px !important;
-            height: 55px !important;
+            width: auto !important;
+            padding: 0 32px !important;
+            height: 48px !important;
             background: linear-gradient(90deg, #98EEFF 0%, #C6F6FF 100%) !important;
             color: #000000 !important;
             border: none !important;
