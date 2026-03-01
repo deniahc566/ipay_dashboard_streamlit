@@ -146,10 +146,10 @@ def render_isafe_page():
     prev_ty_le = cum_prev["Số đơn hủy webview"].sum() / prev_denom if prev_denom > 0 else 0
     delta_ty_le = last_ty_le - prev_ty_le
 
-    last_tai_tuc_dk = last_df["Số đơn tái tục dự kiến"].sum()
-    prev_tai_tuc_dk = prev_df["Số đơn tái tục dự kiến"].sum()
-    last_tt_rate = last_df["Số đơn cấp tái tục"].sum() / last_tai_tuc_dk if last_tai_tuc_dk > 0 else 0
-    prev_tt_rate = prev_df["Số đơn cấp tái tục"].sum() / prev_tai_tuc_dk if prev_tai_tuc_dk > 0 else 0
+    last_tai_tuc_dk = cum_last["Số đơn tái tục dự kiến"].sum()
+    last_tt_rate = cum_last["Số đơn cấp tái tục"].sum() / last_tai_tuc_dk if last_tai_tuc_dk > 0 else 0
+    prev_tai_tuc_dk = cum_prev["Số đơn tái tục dự kiến"].sum()
+    prev_tt_rate = cum_prev["Số đơn cấp tái tục"].sum() / prev_tai_tuc_dk if prev_tai_tuc_dk > 0 else 0
     delta_tai_tuc = last_tt_rate - prev_tt_rate
 
     # ── YoY: cùng kỳ năm trước ───────────────────────────────────────────────
