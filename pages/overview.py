@@ -133,12 +133,14 @@ def render_overview_page():
     kh_prev      = int(prev_df["Số đơn có hiệu lực"].sum()) if prev_df is not None else kh_hien_huu
     delta_kh     = kh_hien_huu - kh_prev
 
-    # Rate metric: delta = last_date daily rate vs prev_date daily rate
-    if prev_df is not None:
-        prev_denom  = int(prev_df["Số đơn cấp mới"].sum()) + int(prev_df["Số đơn cấp tái tục"].sum())
-        prev_ty_le  = prev_df["Số đơn hủy webview"].sum() / prev_denom if prev_denom > 0 else 0
-        last_denom  = int(last_df["Số đơn cấp mới"].sum()) + int(last_df["Số đơn cấp tái tục"].sum())
-        last_ty_le  = last_df["Số đơn hủy webview"].sum() / last_denom if last_denom > 0 else 0
+    # Rate metric: delta = cumulative rate up to last_date vs cumulative rate up to prev_date
+    if prev_date is not None:
+        cum_last    = df[df["Ngày phát sinh"] <= last_date]
+        cum_prev    = df[df["Ngày phát sinh"] <= prev_date]
+        last_denom  = cum_last["Số đơn cấp mới"].sum() + cum_last["Số đơn cấp tái tục"].sum()
+        last_ty_le  = cum_last["Số đơn hủy webview"].sum() / last_denom if last_denom > 0 else 0
+        prev_denom  = cum_prev["Số đơn cấp mới"].sum() + cum_prev["Số đơn cấp tái tục"].sum()
+        prev_ty_le  = cum_prev["Số đơn hủy webview"].sum() / prev_denom if prev_denom > 0 else 0
         delta_ty_le = last_ty_le - prev_ty_le
     else:
         delta_ty_le = 0.0

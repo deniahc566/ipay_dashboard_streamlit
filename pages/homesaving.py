@@ -138,10 +138,12 @@ def render_homesaving_page():
     kh_prev  = int(prev_df["Số đơn có hiệu lực"].sum())
     delta_kh = kh_hien_huu - kh_prev
 
-    prev_denom = int(prev_df["Số đơn cấp mới"].sum()) + int(prev_df["Số đơn cấp tái tục"].sum())
-    prev_ty_le = prev_df["Số đơn hủy webview"].sum() / prev_denom if prev_denom > 0 else 0
-    last_denom = int(last_df["Số đơn cấp mới"].sum()) + int(last_df["Số đơn cấp tái tục"].sum())
-    last_ty_le = last_df["Số đơn hủy webview"].sum() / last_denom if last_denom > 0 else 0
+    cum_last   = df[df["Ngày phát sinh"] <= last_date]
+    cum_prev   = df[df["Ngày phát sinh"] <= prev_date]
+    last_denom = cum_last["Số đơn cấp mới"].sum() + cum_last["Số đơn cấp tái tục"].sum()
+    last_ty_le = cum_last["Số đơn hủy webview"].sum() / last_denom if last_denom > 0 else 0
+    prev_denom = cum_prev["Số đơn cấp mới"].sum() + cum_prev["Số đơn cấp tái tục"].sum()
+    prev_ty_le = cum_prev["Số đơn hủy webview"].sum() / prev_denom if prev_denom > 0 else 0
     delta_ty_le = last_ty_le - prev_ty_le
 
     last_tai_tuc_dk = last_df["Số đơn tái tục dự kiến"].sum()
