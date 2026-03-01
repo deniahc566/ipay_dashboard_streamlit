@@ -249,7 +249,7 @@ def render_overview_page():
             value=f"{kh_hien_huu:,}",
             delta_str=f"{_kh_sign}{delta_kh:,}",
             delta_color=_kh_color,
-            accent_color="#6b3fa0",
+            accent_color="#22B2FA",
         ), unsafe_allow_html=True)
 
     with cols[4]:
@@ -328,9 +328,9 @@ def render_overview_page():
     _legend_html = (
         '<div style="display:flex;gap:14px;margin-bottom:6px;font-size:0.57rem;">'
         '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;'
-        'background:#6b3fa0;margin-right:4px;vertical-align:middle;"></span>Có hiệu lực</span>'
+        'background:#22B2FA;margin-right:4px;vertical-align:middle;"></span>Có hiệu lực</span>'
         '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;'
-        'background:#b39ddb;margin-right:4px;vertical-align:middle;"></span>Tạm ngưng</span>'
+        'background:#98EEFF;margin-right:4px;vertical-align:middle;"></span>Tạm ngưng</span>'
         '</div>'
     )
     st.markdown(_legend_html, unsafe_allow_html=True)
@@ -352,7 +352,7 @@ def render_overview_page():
                     "Loại:N",
                     scale=alt.Scale(
                         domain=["Có hiệu lực", "Tạm ngưng"],
-                        range=["#6b3fa0", "#b39ddb"],
+                        range=["#22B2FA", "#98EEFF"],
                     ),
                     legend=None,
                 ),
@@ -373,7 +373,7 @@ def render_overview_page():
                 f'Tổng KH hiện hữu<br>'
                 f'<strong style="font-size:0.70rem;color:#1a1a2e;">{total_str}</strong>'
                 f'</div>'
-                f'<div style="text-align:center;font-size:0.57rem;color:#6b3fa0;margin-top:3px;">'
+                f'<div style="text-align:center;font-size:0.57rem;color:#22B2FA;margin-top:3px;">'
                 f'Có hiệu lực: <strong>{pct_hieu:.1%}</strong>'
                 f'</div>',
                 unsafe_allow_html=True,

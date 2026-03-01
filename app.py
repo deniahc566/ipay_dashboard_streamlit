@@ -21,14 +21,56 @@ st.set_page_config(
 )
 
 # Always-on: only hide chrome shared across all pages
-st.markdown(
-    "<style>[data-testid='stSidebarNav']{display:none;}"
-    "#MainMenu,footer{visibility:hidden;}</style>",
-    unsafe_allow_html=True,
-)
+st.markdown("""
+    <style>
+    [data-testid='stSidebarNav'] { display: none; }
+    #MainMenu, footer { visibility: hidden; }
+
+    /* ── Sidebar shell ── */
+    [data-testid="stSidebar"] {
+        background-color: #005992 !important;
+    }
+    [data-testid="stSidebar"] > div:first-child {
+        padding: 0 !important;
+    }
+
+    /* ── All nav buttons ── */
+    [data-testid="stSidebar"] button {
+        background: transparent !important;
+        border: none !important;
+        color: rgba(255,255,255,0.8) !important;
+        text-align: left !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        padding: 12px 20px !important;
+        border-radius: 0 !important;
+        letter-spacing: 0.02em !important;
+        box-shadow: none !important;
+    }
+    [data-testid="stSidebar"] button:hover {
+        background: rgba(255,255,255,0.1) !important;
+        color: #fff !important;
+        border-radius: 6px !important;
+    }
+
+    /* ── Sub-item indentation ── */
+    [data-testid="stSidebar"] [data-testid="stButton"]:nth-child(n+3) button {
+        padding-left: 40px !important;
+        font-size: 13px !important;
+        color: rgba(255,255,255,0.65) !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stButton"]:nth-child(n+3) button:hover {
+        color: #fff !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
+if "page" not in st.session_state:
+    st.session_state.page = "Tổng quan"
+if "vhct_open" not in st.session_state:
+    st.session_state.vhct_open = True
 
 if not st.session_state.authenticated:
     # Base64-encode the lock SVG so it embeds cleanly in CSS without encoding issues
@@ -176,11 +218,50 @@ if not st.session_state.authenticated:
     st.stop()
 
 with st.sidebar:
-    page = st.radio(
-        "Chọn dashboard",
-        options=["Tổng quan", "Cyber Risk", "I-Safe", "TapCare", "Nhà và bạn"],
-        label_visibility="collapsed",
-    )
+    # ── Icon-only header ──────────────────────────────────────────────────────
+    st.markdown("""
+        <div style="padding:24px 20px 16px;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:8px;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
+                 xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+                    stroke="white" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round"/>
+              <polyline points="9 22 9 12 15 12 15 22"
+                        stroke="white" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round"/>
+            </svg>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # ── Top-level nav item ────────────────────────────────────────────────────
+    if st.button("Tổng quan hàng ngày", key="nav_overview",
+                 use_container_width=True):
+        st.session_state.page = "Tổng quan"
+        st.rerun()
+
+    # ── Collapsible section header ────────────────────────────────────────────
+    arrow = "▾" if st.session_state.vhct_open else "▸"
+    if st.button(f"Vận hành chi tiết  {arrow}", key="nav_vhct",
+                 use_container_width=True):
+        st.session_state.vhct_open = not st.session_state.vhct_open
+        st.rerun()
+
+    # ── Sub-items (shown when section is expanded) ────────────────────────────
+    if st.session_state.vhct_open:
+        if st.button("Cyber Risk", key="nav_cyber", use_container_width=True):
+            st.session_state.page = "Cyber Risk"
+            st.rerun()
+        if st.button("I-Safe", key="nav_isafe", use_container_width=True):
+            st.session_state.page = "I-Safe"
+            st.rerun()
+        if st.button("TapCare", key="nav_tapcare", use_container_width=True):
+            st.session_state.page = "TapCare"
+            st.rerun()
+        if st.button("Nhà và bạn", key="nav_homesaving", use_container_width=True):
+            st.session_state.page = "Nhà và bạn"
+            st.rerun()
+
+page = st.session_state.page
 
 if page == "Tổng quan":
     render_overview_page()
