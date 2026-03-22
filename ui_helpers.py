@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 
 from data_loader import load_ipay_data
 
@@ -27,12 +28,12 @@ def render_action_buttons() -> None:
             load_ipay_data.clear()
             st.rerun()
     with col_pdf:
-        st.markdown(
-            '<button onclick="window.print()" '
+        components.html(
+            '<button onclick="window.parent.print()" '
             'style="width:100%;height:38px;padding:0 8px;'
             'border:1px solid rgba(49,51,63,0.2);border-radius:6px;'
             'background:#ffffff;cursor:pointer;font-size:0.875rem;'
             'color:rgb(49,51,63);white-space:nowrap;">'
             '📄 Xuất PDF</button>',
-            unsafe_allow_html=True,
+            height=45,
         )
