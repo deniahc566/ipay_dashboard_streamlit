@@ -250,31 +250,50 @@ def render_overview_page():
             *tai_by_prod.index,  *kh_delta_prod.index,
             *huy_by_prod.index,
         })
-        _rows = []
-        for _prod in _all_prods:
-            _t   = float(tien_by_prod.get(_prod, 0))
-            _cap = int(cap_by_prod.get(_prod, 0))
-            _tai = int(tai_by_prod.get(_prod, 0))
-            _kh  = int(kh_delta_prod.get(_prod, 0))
-            _huy = int(huy_by_prod.get(_prod, 0))
-            def _pfx(v, fmt): return f"+{fmt(v)}" if v >= 0 else fmt(v)
-            _rows.append({
-                "Sản phẩm":        _DISPLAY_NAMES.get(_prod, _prod),
-                "Δ Tiền thực thu": _pfx(_t,   _fmt_currency),
-                "Δ Cấp mới":       _pfx(_cap, lambda v: f"{int(v):,}"),
-                "Δ Tái tục":       _pfx(_tai, lambda v: f"{int(v):,}"),
-                "Δ KH hiện hữu":   _pfx(_kh,  lambda v: f"{int(v):,}"),
-                "Δ Hủy chủ động":   _pfx(_huy, lambda v: f"{int(v):,}"),
-            })
-        _detail_df = pd.DataFrame(_rows).set_index("Sản phẩm")
+        _GAN_KEM = {"ISAFE_CYBER", "MIX_01", "TAPCARE", "VTB_HOMESAVING"}
         _green: list = ["Δ Tiền thực thu", "Δ Cấp mới", "Δ Tái tục", "Δ KH hiện hữu"]
         _red:   list = ["Δ Hủy chủ động"]
-        _styled = (
-            _detail_df.style
-            .map(lambda _: "color:#2e7d32;font-weight:600", subset=_green)
-            .map(lambda _: "color:#d71149;font-weight:600", subset=_red)
-        )
-        st.dataframe(_styled, width='stretch')
+
+        def _pfx(v, fmt): return f"+{fmt(v)}" if v >= 0 else fmt(v)
+
+        def _build_rows(prods):
+            rows = []
+            for _prod in prods:
+                _t   = float(tien_by_prod.get(_prod, 0))
+                _cap = int(cap_by_prod.get(_prod, 0))
+                _tai = int(tai_by_prod.get(_prod, 0))
+                _kh  = int(kh_delta_prod.get(_prod, 0))
+                _huy = int(huy_by_prod.get(_prod, 0))
+                rows.append({
+                    "Sản phẩm":        _DISPLAY_NAMES.get(_prod, _prod),
+                    "Δ Tiền thực thu": _pfx(_t,   _fmt_currency),
+                    "Δ Cấp mới":       _pfx(_cap, lambda v: f"{int(v):,}"),
+                    "Δ Tái tục":       _pfx(_tai, lambda v: f"{int(v):,}"),
+                    "Δ KH hiện hữu":   _pfx(_kh,  lambda v: f"{int(v):,}"),
+                    "Δ Hủy chủ động":   _pfx(_huy, lambda v: f"{int(v):,}"),
+                })
+            return rows
+
+        def _show_table(rows):
+            if not rows:
+                return
+            _df = pd.DataFrame(rows).set_index("Sản phẩm")
+            _styled = (
+                _df.style
+                .map(lambda _: "color:#2e7d32;font-weight:600", subset=_green)
+                .map(lambda _: "color:#d71149;font-weight:600", subset=_red)
+            )
+            st.dataframe(_styled, width='stretch')
+
+        _prods_gan_kem = [p for p in _all_prods if p in _GAN_KEM]
+        _prods_ban_le  = [p for p in _all_prods if p not in _GAN_KEM]
+
+        st.markdown("**Sản phẩm gắn kèm**")
+        _show_table(_build_rows(_prods_gan_kem))
+
+        if _prods_ban_le:
+            st.markdown("**Sản phẩm bán lẻ**")
+            _show_table(_build_rows(_prods_ban_le))
 
     # ── Shared helpers ────────────────────────────────────────────────────────
     _NAMED_PRODUCTS = {"MIX_01", "VTB_HOMESAVING", "TAPCARE", "ISAFE_CYBER"}
