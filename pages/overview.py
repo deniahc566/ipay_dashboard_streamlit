@@ -2,8 +2,22 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 
-from config.settings import PRODUCT_DISPLAY_NAMES
 from data_loader import load_ipay_data
+
+PRODUCT_DISPLAY_NAMES = {
+    "ISAFE_CYBER":    "I-Safe",
+    "MIX_01":         "Cyber Risk",
+    "TAPCARE":        "TapCare",
+    "VTB_HOMESAVING": "HomeSaving",
+    "CN.4.1IPAY":     "Du lịch quốc tế bán kèm",
+    "CN.4.1SA":       "Du lịch quốc tế bán lẻ",
+    "CN.4.3IPAY":     "Du lịch trong nước bán kèm",
+    "CN.4.3SA":       "Du lịch trong nước bán lẻ",
+    "CN.6":           "Bảo hiểm sức khỏe",
+    "XC.1.1":         "Bảo hiểm xe máy",
+    "XE":             "Bảo hiểm ô tô",
+    "UTV":            "Ung thư vú",
+}
 from ui_helpers import render_action_buttons
 
 
