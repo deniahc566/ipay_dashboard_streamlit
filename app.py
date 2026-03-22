@@ -13,6 +13,7 @@ from pages.cyber_risk import render_cyber_risk_page
 from pages.isafe import render_isafe_page
 from pages.tapcare import render_tapcare_page
 from pages.homesaving import render_homesaving_page
+from pages.other_products import render_other_products_page
 
 st.set_page_config(
     page_title="VBI iPay Dashboard",
@@ -245,7 +246,7 @@ with st.sidebar:
 
     # ── Collapsible section header ────────────────────────────────────────────
     arrow = "▾" if st.session_state.vhct_open else "▸"
-    if st.button(f"Vận hành chi tiết  {arrow}", key="nav_vhct",
+    if st.button(f"Sản phẩm gắn kèm {arrow}", key="nav_vhct",
                  use_container_width=True):
         st.session_state.vhct_open = not st.session_state.vhct_open
         st.rerun()
@@ -264,6 +265,9 @@ with st.sidebar:
         if st.button("Nhà và bạn", key="nav_homesaving", use_container_width=True):
             st.session_state.page = "Nhà và bạn"
             st.rerun()
+        if st.button("Sản phẩm khác", key="nav_other", use_container_width=True):
+            st.session_state.page = "Sản phẩm khác"
+            st.rerun()
 
 page = st.session_state.page
 
@@ -275,5 +279,9 @@ elif page == "I-Safe":
     render_isafe_page()
 elif page == "TapCare":
     render_tapcare_page()
+elif page == "Nhà và bạn":
+    render_homesaving_page()
+elif page == "Sản phẩm khác":
+    render_other_products_page()
 else:
     render_homesaving_page()

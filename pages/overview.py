@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 
+from config.settings import PRODUCT_DISPLAY_NAMES
 from data_loader import load_ipay_data
 from ui_helpers import render_action_buttons
 
@@ -98,6 +99,7 @@ def render_overview_page():
 
     # ── Shared constants (needed by both delta and chart sections) ───────────
     _NAMED_PRODUCTS = {"MIX_01", "VTB_HOMESAVING", "TAPCARE", "ISAFE_CYBER"}
+    _DISPLAY_NAMES = {**PRODUCT_DISPLAY_NAMES, "Sản phẩm khác": "Sản phẩm khác"}
 
     # ── Deltas — giá trị tuyệt đối của last_date (báo cáo chậm 1 ngày) ───────
     delta_tien    = last_df["Tiền thực thu"].sum()
@@ -257,7 +259,7 @@ def render_overview_page():
             _huy = int(huy_by_prod.get(_prod, 0))
             def _pfx(v, fmt): return f"+{fmt(v)}" if v >= 0 else fmt(v)
             _rows.append({
-                "Sản phẩm":        _prod,
+                "Sản phẩm":        _DISPLAY_NAMES.get(_prod, _prod),
                 "Δ Tiền thực thu": _pfx(_t,   _fmt_currency),
                 "Δ Cấp mới":       _pfx(_cap, lambda v: f"{int(v):,}"),
                 "Δ Tái tục":       _pfx(_tai, lambda v: f"{int(v):,}"),
@@ -314,7 +316,7 @@ def render_overview_page():
 
     kh_cols = st.columns(len(kh_prod_df))
     for col, (_, row) in zip(kh_cols, kh_prod_df.iterrows()):
-        prod  = row["PROD_CODE"]
+        prod  = _DISPLAY_NAMES.get(row["PROD_CODE"], row["PROD_CODE"])
         total = int(row["total"])
         pie_df = pd.DataFrame({
             "Loại":   ["Có hiệu lực", "Tạm ngưng"],
@@ -386,6 +388,7 @@ def render_overview_page():
             .assign(Năm=lambda x: x["Năm"].astype(str))
         )
         chart_df["label"] = chart_df["Tiền thực thu"].apply(_fmt_vnd)
+        chart_df["PROD_CODE"] = chart_df["PROD_CODE"].map(lambda c: _DISPLAY_NAMES.get(c, c))
         prod_order = (
             chart_df.groupby("PROD_CODE")["Tiền thực thu"]
             .sum()
@@ -401,7 +404,7 @@ def render_overview_page():
                 color=alt.Color("Năm:N", title="Năm", legend=None, scale=alt.Scale(range=["#2C4C7B", "#6B9ED4"])),
                 xOffset=alt.XOffset("Năm:N"),
                 tooltip=[
-                    alt.Tooltip("PROD_CODE:N", title="Mã sản phẩm"),
+                    alt.Tooltip("PROD_CODE:N", title="Sản phẩm"),
                     alt.Tooltip("Năm:N", title="Năm"),
                     alt.Tooltip("label:N", title="Tiền thực thu"),
                 ],
@@ -423,7 +426,7 @@ def render_overview_page():
     # ── Chart 2: Tiền thực thu theo tháng (bar) ───────────────────────────────
     with col_trend:
         _chart_title("Tiền thực thu theo tháng")
-        prod_options = sorted(_NAMED_PRODUCTS) + ["Sản phẩm khác"]
+        prod_options = [_DISPLAY_NAMES.get(p, p) for p in sorted(_NAMED_PRODUCTS)] + ["Sản phẩm khác"]
         selected_trend_prods = st.multiselect(
             "Lọc sản phẩm",
             options=prod_options,
@@ -432,7 +435,7 @@ def render_overview_page():
             key="rev_month_prods",
         )
         if selected_trend_prods:
-            mask = _group_prod(df["PROD_CODE"]).isin(selected_trend_prods)
+            mask = _group_prod(df["PROD_CODE"]).map(lambda c: _DISPLAY_NAMES.get(c, c)).isin(selected_trend_prods)
             df_trend = df[mask]
         else:
             df_trend = df
@@ -517,6 +520,7 @@ def render_overview_page():
         )
         huy_prod_df["Tỷ lệ hủy"] = huy_prod_df["huy"] / (huy_prod_df["cap"] + huy_prod_df["tai_tuc"]).replace(0, float("nan"))
         huy_prod_df = huy_prod_df[huy_prod_df["PROD_CODE"] != "Sản phẩm khác"]
+        huy_prod_df["PROD_CODE"] = huy_prod_df["PROD_CODE"].map(lambda c: _DISPLAY_NAMES.get(c, c))
         huy_prod_df = huy_prod_df.sort_values("Tỷ lệ hủy", ascending=False)
         huy_prod_df["label"] = huy_prod_df["Tỷ lệ hủy"].apply(lambda v: f"{v:.2%}")
         huy_order = huy_prod_df["PROD_CODE"].tolist()
@@ -570,6 +574,7 @@ def render_overview_page():
             .sum()
             .assign(Năm=lambda x: x["Năm"].astype(str))
         )
+        new_prod_agg["PROD_CODE"] = new_prod_agg["PROD_CODE"].map(lambda c: _DISPLAY_NAMES.get(c, c))
         new_prod_order = (
             new_prod_agg.groupby("PROD_CODE")["Số đơn cấp mới"]
             .sum()
@@ -603,7 +608,7 @@ def render_overview_page():
                 xOffset=alt.XOffset("Nhóm:N", sort=nhom_domain_np),
                 color=_np_color,
                 tooltip=[
-                    alt.Tooltip("PROD_CODE:N", title="Mã sản phẩm"),
+                    alt.Tooltip("PROD_CODE:N", title="Sản phẩm"),
                     alt.Tooltip("Loại:N", title="Loại"),
                     alt.Tooltip("Năm:N", title="Năm"),
                     alt.Tooltip("Số đơn:Q", title="Số đơn", format=",.0f"),
@@ -628,13 +633,13 @@ def render_overview_page():
     _chart_title("Số đơn cấp mới và số đơn hủy theo tháng")
     selected_new_prods = st.multiselect(
         "Lọc sản phẩm",
-        options=sorted(_NAMED_PRODUCTS) + ["Sản phẩm khác"],
+        options=[_DISPLAY_NAMES.get(p, p) for p in sorted(_NAMED_PRODUCTS)] + ["Sản phẩm khác"],
         default=[],
         placeholder="Tất cả sản phẩm",
         key="new_month_prods",
     )
     if selected_new_prods:
-        mask_new = _group_prod(df["PROD_CODE"]).isin(selected_new_prods)
+        mask_new = _group_prod(df["PROD_CODE"]).map(lambda c: _DISPLAY_NAMES.get(c, c)).isin(selected_new_prods)
         df_new_month = df[mask_new]
     else:
         df_new_month = df
