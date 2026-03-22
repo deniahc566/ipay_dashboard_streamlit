@@ -259,12 +259,25 @@ def render_overview_page():
     st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
     _exp_date = pd.Timestamp(last_date).strftime("%d/%m/%Y")
     with st.expander(f"↕ Chi tiết thay đổi theo sản phẩm — ngày {_exp_date}"):
-        _all_prods = sorted({
-            *tien_by_prod.index, *cap_by_prod.index,
-            *tai_by_prod.index,  *kh_delta_prod.index,
-            *huy_by_prod.index,
-        })
-        _GAN_KEM = {"ISAFE_CYBER", "MIX_01", "TAPCARE", "VTB_HOMESAVING"}
+        # Raw per-product series (không gộp "Sản phẩm khác")
+        _raw_tien = last_df.groupby("PROD_CODE")["Tiền thực thu"].sum()
+        _raw_cap  = last_df.groupby("PROD_CODE")["Số đơn cấp mới"].sum()
+        _raw_tai  = last_df.groupby("PROD_CODE")["Số đơn cấp tái tục"].sum()
+        _raw_huy  = last_df.groupby("PROD_CODE")["Số đơn hủy webview"].sum()
+        _raw_kh_last = last_df.groupby("PROD_CODE")["Số đơn có hiệu lực"].sum()
+        if prev_df is not None:
+            _raw_kh_prev = prev_df.groupby("PROD_CODE")["Số đơn có hiệu lực"].sum()
+            _raw_kh_delta = _raw_kh_last.subtract(_raw_kh_prev, fill_value=0)
+        else:
+            _raw_kh_delta = _raw_kh_last
+
+        _BAN_KEM = [
+            "ISAFE_CYBER", "MIX_01", "TAPCARE", "VTB_HOMESAVING",
+            "CN.4.1IPAY", "CN.4.3IPAY",
+        ]
+        _BAN_LE = [
+            "CN.4.1SA", "CN.4.3SA", "CN.6", "XC.1.1", "XE", "UTV",
+        ]
         _green: list = ["Δ Tiền thực thu", "Δ Cấp mới", "Δ Tái tục", "Δ KH hiện hữu"]
         _red:   list = ["Δ Hủy chủ động"]
 
@@ -273,24 +286,22 @@ def render_overview_page():
         def _build_rows(prods):
             rows = []
             for _prod in prods:
-                _t   = float(tien_by_prod.get(_prod, 0))
-                _cap = int(cap_by_prod.get(_prod, 0))
-                _tai = int(tai_by_prod.get(_prod, 0))
-                _kh  = int(kh_delta_prod.get(_prod, 0))
-                _huy = int(huy_by_prod.get(_prod, 0))
+                _t   = float(_raw_tien.get(_prod, 0))
+                _cap = int(_raw_cap.get(_prod, 0))
+                _tai = int(_raw_tai.get(_prod, 0))
+                _kh  = int(_raw_kh_delta.get(_prod, 0))
+                _huy = int(_raw_huy.get(_prod, 0))
                 rows.append({
                     "Sản phẩm":        _DISPLAY_NAMES.get(_prod, _prod),
                     "Δ Tiền thực thu": _pfx(_t,   _fmt_currency),
                     "Δ Cấp mới":       _pfx(_cap, lambda v: f"{int(v):,}"),
                     "Δ Tái tục":       _pfx(_tai, lambda v: f"{int(v):,}"),
                     "Δ KH hiện hữu":   _pfx(_kh,  lambda v: f"{int(v):,}"),
-                    "Δ Hủy chủ động":   _pfx(_huy, lambda v: f"{int(v):,}"),
+                    "Δ Hủy chủ động":  _pfx(_huy, lambda v: f"{int(v):,}"),
                 })
             return rows
 
         def _show_table(rows):
-            if not rows:
-                return
             _df = pd.DataFrame(rows).set_index("Sản phẩm")
             _styled = (
                 _df.style
@@ -299,15 +310,11 @@ def render_overview_page():
             )
             st.dataframe(_styled, width='stretch')
 
-        _prods_gan_kem = [p for p in _all_prods if p in _GAN_KEM]
-        _prods_ban_le  = [p for p in _all_prods if p not in _GAN_KEM]
+        st.markdown("**Sản phẩm bán kèm**")
+        _show_table(_build_rows(_BAN_KEM))
 
-        st.markdown("**Sản phẩm gắn kèm**")
-        _show_table(_build_rows(_prods_gan_kem))
-
-        if _prods_ban_le:
-            st.markdown("**Sản phẩm bán lẻ**")
-            _show_table(_build_rows(_prods_ban_le))
+        st.markdown("**Sản phẩm bán lẻ**")
+        _show_table(_build_rows(_BAN_LE))
 
     # ── Shared helpers ────────────────────────────────────────────────────────
     _NAMED_PRODUCTS = {"MIX_01", "VTB_HOMESAVING", "TAPCARE", "ISAFE_CYBER"}
