@@ -2,11 +2,25 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 
-from config.settings import PRODUCT_DISPLAY_NAMES
 from data_loader import load_ipay_data
 from ui_helpers import render_action_buttons
 
 _NAMED_PRODUCTS = {"MIX_01", "VTB_HOMESAVING", "TAPCARE", "ISAFE_CYBER"}
+
+_PRODUCT_DISPLAY_NAMES = {
+    "ISAFE_CYBER":    "I-Safe",
+    "MIX_01":         "Cyber Risk",
+    "TAPCARE":        "TapCare",
+    "VTB_HOMESAVING": "HomeSaving",
+    "CN.4.1IPAY":     "Du lịch quốc tế bán kèm",
+    "CN.4.1SA":       "Du lịch quốc tế bán lẻ",
+    "CN.4.3IPAY":     "Du lịch trong nước bán kèm",
+    "CN.4.3SA":       "Du lịch trong nước bán lẻ",
+    "CN.6":           "Bảo hiểm sức khỏe",
+    "XC.1.1":         "Bảo hiểm xe máy",
+    "XE":             "Bảo hiểm ô tô",
+    "UTV":            "Ung thư vú",
+}
 
 
 def _fmt_currency(value: float) -> str:
@@ -152,7 +166,7 @@ def render_other_products_page():
         ), unsafe_allow_html=True)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
-    _display_names = {**PRODUCT_DISPLAY_NAMES}
+    _display_names = _PRODUCT_DISPLAY_NAMES
 
     def _prod_label(code: str) -> str:
         return _display_names.get(code, code)
