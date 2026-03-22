@@ -1,37 +1,11 @@
-import os
 import streamlit as st
-import duckdb
 import pandas as pd
 import altair as alt
-from dotenv import load_dotenv
 
-load_dotenv()
-
-_NUMERIC_COLS = [
-    "Tiền thực thu",
-    "Số đơn cấp mới",
-    "Số đơn cấp tái tục",
-    "Số đơn tái tục dự kiến",
-    "Số đơn có hiệu lực",
-    "Số đơn tạm ngưng",
-    "Số đơn hủy webview",
-]
+from data_loader import load_ipay_data
+from ui_helpers import render_action_buttons
 
 _ISAFE_PROD_CODE = "ISAFE_CYBER"
-
-
-@st.cache_data(ttl=300)
-def _load_data() -> pd.DataFrame:
-    token = os.environ.get("MOTHERDUCK_TOKEN")
-    if not token:
-        raise EnvironmentError("MOTHERDUCK_TOKEN chưa được đặt trong biến môi trường.")
-    con = duckdb.connect(f"md:ipay_data?motherduck_token={token}")
-    df = con.execute("SELECT * FROM gold.ipay_quantity_rev_data").df()
-    con.close()
-    for col in _NUMERIC_COLS:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-    return df
 
 
 def _fmt_currency(value: float) -> str:
@@ -79,9 +53,10 @@ def render_isafe_page():
         'BÁO CÁO CHI TIẾT SẢN PHẨM I-SAFE</h1>',
         unsafe_allow_html=True,
     )
+    render_action_buttons()
 
     try:
-        full_df = _load_data()
+        full_df = load_ipay_data()
     except Exception as e:
         st.error(f"Không thể tải dữ liệu: {e}")
         return
