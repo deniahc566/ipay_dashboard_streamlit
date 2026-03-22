@@ -17,7 +17,7 @@ from pages.homesaving import render_homesaving_page
 st.set_page_config(
     page_title="VBI iPay Dashboard",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 # Always-on: only hide chrome shared across all pages
@@ -89,7 +89,8 @@ if not st.session_state.authenticated:
 
     st.markdown(f"""
         <style>
-        /* ── Hide sidebar toggle on login page ── */
+        /* ── Hide sidebar and its toggle on login page ── */
+        [data-testid="stSidebar"],
         [data-testid="stSidebarCollapsedControl"] {{ display: none !important; }}
 
         /* ── Page background ── */
