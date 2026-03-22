@@ -278,6 +278,9 @@ def render_overview_page():
         _BAN_LE = [
             "CN.4.1SA", "CN.4.3SA", "CN.6", "XC.1.1", "XE", "UTV",
         ]
+        # Sản phẩm không có tái tục / KH hiện hữu / hủy chủ động
+        _NA_PRODS = {"CN.4.1IPAY", "CN.4.3IPAY", "CN.4.1SA", "CN.4.3SA",
+                     "CN.6", "XC.1.1", "XE", "UTV"}
         _green: list = ["Δ Tiền thực thu", "Δ Cấp mới", "Δ Tái tục", "Δ KH hiện hữu"]
         _red:   list = ["Δ Hủy chủ động"]
 
@@ -288,25 +291,27 @@ def render_overview_page():
             for _prod in prods:
                 _t   = float(_raw_tien.get(_prod, 0))
                 _cap = int(_raw_cap.get(_prod, 0))
-                _tai = int(_raw_tai.get(_prod, 0))
-                _kh  = int(_raw_kh_delta.get(_prod, 0))
-                _huy = int(_raw_huy.get(_prod, 0))
+                _na  = _prod in _NA_PRODS
                 rows.append({
                     "Sản phẩm":        _DISPLAY_NAMES.get(_prod, _prod),
                     "Δ Tiền thực thu": _pfx(_t,   _fmt_currency),
                     "Δ Cấp mới":       _pfx(_cap, lambda v: f"{int(v):,}"),
-                    "Δ Tái tục":       _pfx(_tai, lambda v: f"{int(v):,}"),
-                    "Δ KH hiện hữu":   _pfx(_kh,  lambda v: f"{int(v):,}"),
-                    "Δ Hủy chủ động":  _pfx(_huy, lambda v: f"{int(v):,}"),
+                    "Δ Tái tục":       "N/A" if _na else _pfx(int(_raw_tai.get(_prod, 0)),    lambda v: f"{int(v):,}"),
+                    "Δ KH hiện hữu":   "N/A" if _na else _pfx(int(_raw_kh_delta.get(_prod, 0)), lambda v: f"{int(v):,}"),
+                    "Δ Hủy chủ động":  "N/A" if _na else _pfx(int(_raw_huy.get(_prod, 0)),    lambda v: f"{int(v):,}"),
                 })
             return rows
 
         def _show_table(rows):
             _df = pd.DataFrame(rows).set_index("Sản phẩm")
+            def _color_cell(val, positive_color):
+                if val == "N/A":
+                    return "color:#999999;"
+                return f"{positive_color};font-weight:600"
             _styled = (
                 _df.style
-                .map(lambda _: "color:#2e7d32;font-weight:600", subset=_green)
-                .map(lambda _: "color:#d71149;font-weight:600", subset=_red)
+                .map(lambda v: _color_cell(v, "color:#2e7d32"), subset=_green)
+                .map(lambda v: _color_cell(v, "color:#d71149"), subset=_red)
             )
             st.dataframe(_styled, width='stretch')
 
