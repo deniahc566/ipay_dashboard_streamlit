@@ -290,12 +290,14 @@ def render_other_products_page():
     avg_new_df["label"] = avg_new_df["TB/ngày"].apply(lambda v: f"{v:,.1f}")
 
     with col_avg_rev:
+        _rev_max = avg_rev_df["TB/ngày"].max() if not avg_rev_df.empty else 1
         line_rev = (
             alt.Chart(avg_rev_df[avg_rev_df["TB/ngày"] > 0])
             .mark_line(color="#2C4C7B", point=alt.OverlayMarkDef(color="#2C4C7B"))
             .encode(
                 x=alt.X("Tháng:N", title=None, sort=None, axis=alt.Axis(labelAngle=-30)),
-                y=alt.Y("TB/ngày:Q", title=None, axis=None),
+                y=alt.Y("TB/ngày:Q", title=None, axis=None,
+                        scale=alt.Scale(domainMax=_rev_max * 1.18)),
                 tooltip=[
                     alt.Tooltip("Tháng:N", title="Tháng"),
                     alt.Tooltip("label:N", title="TB/ngày"),
@@ -304,10 +306,10 @@ def render_other_products_page():
         )
         text_rev = (
             alt.Chart(avg_rev_df[avg_rev_df["TB/ngày"] > 0])
-            .mark_text(dy=-12, fontSize=11, color="#2C4C7B")
+            .mark_text(dy=-12, fontSize=11, color="#2C4C7B", clip=False)
             .encode(
                 x=alt.X("Tháng:N", sort=None),
-                y=alt.Y("TB/ngày:Q"),
+                y=alt.Y("TB/ngày:Q", scale=alt.Scale(domainMax=_rev_max * 1.18)),
                 text=alt.Text("label:N"),
             )
         )

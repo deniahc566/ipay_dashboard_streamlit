@@ -44,7 +44,7 @@ def _bar_with_label(data, x_field, y_field, height=220, x_sort=None, label_forma
         .properties(height=height)
     )
     label = bar.mark_text(
-        align="center", dy=-6, fontSize=11, fontWeight="bold", clip=False
+        align="center", dy=-6, fontSize=11, fontWeight="normal", clip=False
     ).encode(text=alt.Text(f"{y_field}:Q", format=label_format))
     return bar + label
 
@@ -225,7 +225,7 @@ def render_complaints_page():
                 tooltip=["products:N", alt.Tooltip("avg:Q", format=".2f", title="TB/ngày")],
             ).properties(height=220)
         )
-        lbl1 = bar1.mark_text(align="center", dy=-6, fontSize=11, fontWeight="bold", clip=False).encode(
+        lbl1 = bar1.mark_text(align="center", dy=-6, fontSize=11, fontWeight="normal", clip=False).encode(
             text=alt.Text("avg:Q", format=".2f")
         )
         st.altair_chart(bar1 + lbl1, use_container_width=True)
@@ -295,7 +295,7 @@ def render_complaints_page():
                 tooltip=["Tháng:O", alt.Tooltip("Số KN:Q", title="Số KN")],
             ).properties(height=320)
         )
-        lbl_line = line.mark_text(align="center", dy=-12, fontSize=10, fontWeight="bold").encode(
+        lbl_line = line.mark_text(align="center", dy=-12, fontSize=10, fontWeight="normal").encode(
             text=alt.Text("Số KN:Q", format=",")
         )
         st.altair_chart(line + lbl_line, use_container_width=True)
