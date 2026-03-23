@@ -3,22 +3,10 @@ import pandas as pd
 import altair as alt
 
 from data_loader import load_ipay_data
-
-PRODUCT_DISPLAY_NAMES = {
-    "ISAFE_CYBER":    "I-Safe",
-    "MIX_01":         "Cyber Risk",
-    "TAPCARE":        "TapCare",
-    "VTB_HOMESAVING": "HomeSaving",
-    "CN.4.1IPAY":     "Du lịch quốc tế bán kèm",
-    "CN.4.1SA":       "Du lịch quốc tế bán lẻ",
-    "CN.4.3IPAY":     "Du lịch trong nước bán kèm",
-    "CN.4.3SA":       "Du lịch trong nước bán lẻ",
-    "CN.6":           "Bảo hiểm sức khỏe",
-    "XC.1.1":         "Bảo hiểm xe máy",
-    "XE":             "Bảo hiểm ô tô",
-    "UTV":            "Ung thư vú",
-}
-from ui_helpers import render_action_buttons
+from ui_helpers import (
+    render_action_buttons, fmt_currency, kpi_card, yoy_caption,
+    NAMED_PRODUCTS, PRODUCT_DISPLAY_NAMES,
+)
 
 
 def _chart_title(text: str) -> None:
@@ -28,14 +16,6 @@ def _chart_title(text: str) -> None:
         f'margin:0 0 0.28rem 0;line-height:1.3;">{text}</p>',
         unsafe_allow_html=True,
     )
-
-
-def _fmt_currency(value: float) -> str:
-    billions = value / 1_000_000_000
-    if billions >= 1:
-        return f"{billions:,.2f} tỷ"
-    millions = value / 1_000_000
-    return f"{millions:,.1f} tr"
 
 
 def render_overview_page():
@@ -100,20 +80,8 @@ def render_overview_page():
     yoy_cap_moi = int(yoy_df["Số đơn cấp mới"].sum())
     yoy_tai_tuc = int(yoy_df["Số đơn cấp tái tục"].sum())
 
-    def _yoy_caption(current_val: float, yoy_val: float, fmt_fn) -> str:
-        if yoy_val == 0:
-            return f'<span style="font-size:0.56rem;color:#888">Cùng kỳ {prev_year}: N/A</span>'
-        pct   = (current_val - yoy_val) / abs(yoy_val)
-        arrow = "▲" if pct > 0 else "▼"
-        color = "#2e7d32" if pct > 0 else "#c62828"
-        return (
-            f'<span style="font-size:0.56rem;color:#888">Cùng kỳ {prev_year}: {fmt_fn(yoy_val)}&nbsp;&nbsp;</span>'
-            f'<span style="font-size:0.56rem;font-weight:600;color:{color}">{arrow} {pct:+.1%}</span>'
-        )
-
-    # ── Shared constants (needed by both delta and chart sections) ───────────
-    _NAMED_PRODUCTS = {"MIX_01", "VTB_HOMESAVING", "TAPCARE", "ISAFE_CYBER"}
-    _DISPLAY_NAMES = {**PRODUCT_DISPLAY_NAMES, "Sản phẩm khác": "Sản phẩm khác"}
+    # ── Shared alias ─────────────────────────────────────────────────────────
+    _DISPLAY_NAMES = PRODUCT_DISPLAY_NAMES
 
     # ── Deltas — giá trị tuyệt đối của last_date (báo cáo chậm 1 ngày) ───────
     delta_tien    = last_df["Tiền thực thu"].sum()
@@ -138,7 +106,7 @@ def render_overview_page():
 
     # ── Product breakdown for scorecard tooltips ──────────────────────────────
     def _grp(s: pd.Series) -> pd.Series:
-        return s.where(s.isin(_NAMED_PRODUCTS), other="Sản phẩm khác")
+        return s.where(s.isin(NAMED_PRODUCTS), other="Sản phẩm khác")
 
     last_grp     = last_df.assign(PROD_CODE=lambda x: _grp(x["PROD_CODE"]))
     tien_by_prod = last_grp.groupby("PROD_CODE")["Tiền thực thu"].sum().sort_values(ascending=False)
@@ -154,44 +122,6 @@ def render_overview_page():
         kh_delta_prod = last_kh_prod.sort_values(ascending=False)
 
     # ── Scorecards ───────────────────────────────────────────────────────────
-    def _kpi_card(
-        label, value, delta_str, delta_color,
-        accent_color="#2C4C7B", subtitle="", yoy_html="", progress_pct=None,
-    ):
-        # Sidebar: chỉ hiện khi có KPI target (progress_pct)
-        if progress_pct is not None:
-            fill = f"{progress_pct * 100:.1f}%"
-            sidebar = (
-                f'<div style="width:4px;border-radius:3px;background:#e8e8e8;flex-shrink:0;'
-                f'position:relative;overflow:hidden;">'
-                f'<div style="position:absolute;bottom:0;width:100%;height:{fill};'
-                f'background:{accent_color};border-radius:3px;"></div></div>'
-            )
-            pad_left = "10px"
-        else:
-            sidebar   = ""
-            pad_left  = "14px"
-        # Dùng list + join để không tạo blank line — blank line phá HTML block trong markdown
-        parts = [
-            f'<div style="background:#ffffff;border:1px solid #e0e0e0;border-radius:8px;'
-            f'padding:14px 14px 11px {pad_left};box-shadow:0 2px 8px rgba(0,0,0,0.06);'
-            f'display:flex;gap:8px;align-items:stretch;min-height:126px;">',
-            sidebar,
-            f'<div style="flex:1;min-width:0;">',
-            f'<div style="font-size:0.55rem;font-weight:600;color:#555;text-transform:uppercase;'
-            f'letter-spacing:0.04em;margin-bottom:4px;">{label}</div>',
-            f'<div style="font-size:1.26rem;font-weight:700;color:#1a1a2e;line-height:1.1;">{value}</div>',
-        ]
-        if subtitle:
-            parts.append(f'<div style="font-size:0.56rem;color:#888;margin-top:1px;">{subtitle}</div>')
-        parts.append(
-            f'<div style="margin-top:3px;font-size:0.57rem;font-weight:600;color:{delta_color};">{delta_str}</div>'
-        )
-        if yoy_html:
-            parts.append(f'<div style="margin-top:3px;">{yoy_html}</div>')
-        parts += ['</div>', '</div>']
-        return "".join(parts)
-
     _prev_str = pd.Timestamp(prev_date).strftime("%d-%m-%Y") if prev_date is not None else "N/A"
     st.markdown(
         f'<p style="font-size:0.78rem;color:#888;margin-bottom:4px">'
@@ -203,41 +133,41 @@ def render_overview_page():
     with cols[0]:
         _pct = min(tong_tien / 320_000_000_000, 1.0)
         _ds  = "+" if delta_tien >= 0 else ""
-        st.markdown(_kpi_card(
+        st.markdown(kpi_card(
             label="Tổng tiền thực thu",
-            value=_fmt_currency(tong_tien),
-            delta_str=f"{_ds}{_fmt_currency(delta_tien)}",
+            value=fmt_currency(tong_tien),
+            delta_str=f"{_ds}{fmt_currency(delta_tien)}",
             delta_color="#2e7d32",
             accent_color="#2C4C7B",
             subtitle=f"/ 320 tỷ &nbsp;·&nbsp; <strong style='color:#2C4C7B;'>{_pct:.1%}</strong>",
-            yoy_html=_yoy_caption(tong_tien, yoy_tien, _fmt_currency),
+            yoy_html=yoy_caption(tong_tien, yoy_tien, fmt_currency, prev_year),
             progress_pct=_pct,
         ), unsafe_allow_html=True)
 
     with cols[1]:
-        st.markdown(_kpi_card(
+        st.markdown(kpi_card(
             label="Tổng số đơn cấp mới",
             value=f"{tong_cap_moi:,}",
             delta_str=f"+{delta_cap_moi:,}",
             delta_color="#2e7d32",
             accent_color="#6A415E",
-            yoy_html=_yoy_caption(tong_cap_moi, yoy_cap_moi, lambda v: f"{int(v):,}"),
+            yoy_html=yoy_caption(tong_cap_moi, yoy_cap_moi, lambda v: f"{int(v):,}", prev_year),
         ), unsafe_allow_html=True)
 
     with cols[2]:
-        st.markdown(_kpi_card(
+        st.markdown(kpi_card(
             label="Tổng số đơn tái tục",
             value=f"{tong_tai_tuc:,}",
             delta_str=f"+{delta_tai_tuc:,}",
             delta_color="#2e7d32",
             accent_color="#2C7B6F",
-            yoy_html=_yoy_caption(tong_tai_tuc, yoy_tai_tuc, lambda v: f"{int(v):,}"),
+            yoy_html=yoy_caption(tong_tai_tuc, yoy_tai_tuc, lambda v: f"{int(v):,}", prev_year),
         ), unsafe_allow_html=True)
 
     with cols[3]:
         _kh_color = "#2e7d32" if delta_kh >= 0 else "#c62828"
         _kh_sign  = "+" if delta_kh >= 0 else ""
-        st.markdown(_kpi_card(
+        st.markdown(kpi_card(
             label="Tổng số KH hiện hữu",
             value=f"{kh_hien_huu:,}",
             delta_str=f"{_kh_sign}{delta_kh:,}",
@@ -247,7 +177,7 @@ def render_overview_page():
 
     with cols[4]:
         _huy_color = "#c62828" if delta_ty_le > 0 else "#2e7d32"
-        st.markdown(_kpi_card(
+        st.markdown(kpi_card(
             label="Tỷ lệ hủy chủ động",
             value=f"{ty_le_huy:.1%}",
             delta_str=f"{delta_ty_le:+.2%}",
@@ -260,11 +190,18 @@ def render_overview_page():
     _exp_date = pd.Timestamp(last_date).strftime("%d/%m/%Y")
     with st.expander(f"↕ Chi tiết thay đổi theo sản phẩm — ngày {_exp_date}"):
         # Raw per-product series (không gộp "Sản phẩm khác")
-        _raw_tien = last_df.groupby("PROD_CODE")["Tiền thực thu"].sum()
-        _raw_cap  = last_df.groupby("PROD_CODE")["Số đơn cấp mới"].sum()
-        _raw_tai  = last_df.groupby("PROD_CODE")["Số đơn cấp tái tục"].sum()
-        _raw_huy  = last_df.groupby("PROD_CODE")["Số đơn hủy webview"].sum()
-        _raw_kh_last = last_df.groupby("PROD_CODE")["Số đơn có hiệu lực"].sum()
+        _agg = last_df.groupby("PROD_CODE").agg({
+            "Tiền thực thu":      "sum",
+            "Số đơn cấp mới":     "sum",
+            "Số đơn cấp tái tục": "sum",
+            "Số đơn hủy webview": "sum",
+            "Số đơn có hiệu lực": "sum",
+        })
+        _raw_tien    = _agg["Tiền thực thu"]
+        _raw_cap     = _agg["Số đơn cấp mới"]
+        _raw_tai     = _agg["Số đơn cấp tái tục"]
+        _raw_huy     = _agg["Số đơn hủy webview"]
+        _raw_kh_last = _agg["Số đơn có hiệu lực"]
         if prev_df is not None:
             _raw_kh_prev = prev_df.groupby("PROD_CODE")["Số đơn có hiệu lực"].sum()
             _raw_kh_delta = _raw_kh_last.subtract(_raw_kh_prev, fill_value=0)
@@ -294,7 +231,7 @@ def render_overview_page():
                 _na  = _prod in _NA_PRODS
                 rows.append({
                     "Sản phẩm":        _DISPLAY_NAMES.get(_prod, _prod),
-                    "Δ Tiền thực thu": _pfx(_t,   _fmt_currency),
+                    "Δ Tiền thực thu": _pfx(_t,   fmt_currency),
                     "Δ Cấp mới":       _pfx(_cap, lambda v: f"{int(v):,}"),
                     "Δ Tái tục":       "N/A" if _na else _pfx(int(_raw_tai.get(_prod, 0)),    lambda v: f"{int(v):,}"),
                     "Δ KH hiện hữu":   "N/A" if _na else _pfx(int(_raw_kh_delta.get(_prod, 0)), lambda v: f"{int(v):,}"),
@@ -322,15 +259,8 @@ def render_overview_page():
         _show_table(_build_rows(_BAN_LE))
 
     # ── Shared helpers ────────────────────────────────────────────────────────
-    _NAMED_PRODUCTS = {"MIX_01", "VTB_HOMESAVING", "TAPCARE", "ISAFE_CYBER"}
-
-    def _fmt_vnd(v: float) -> str:
-        if v >= 1_000_000_000:
-            return f"{v / 1_000_000_000:.2f} tỷ"
-        return f"{v / 1_000_000:.2f} triệu"
-
     def _group_prod(series: pd.Series) -> pd.Series:
-        return series.where(series.isin(_NAMED_PRODUCTS), other="Sản phẩm khác")
+        return series.where(series.isin(NAMED_PRODUCTS), other="Sản phẩm khác")
 
     # ── KH hiện hữu — pie chart mỗi sản phẩm ────────────────────────────────
     kh_prod_df = (
@@ -340,7 +270,7 @@ def render_overview_page():
         .sum()
     )
     kh_prod_df = (
-        kh_prod_df[kh_prod_df["PROD_CODE"].isin(_NAMED_PRODUCTS)]
+        kh_prod_df[kh_prod_df["PROD_CODE"].isin(NAMED_PRODUCTS)]
         .copy()
     )
     kh_prod_df["total"] = kh_prod_df["Số đơn có hiệu lực"] + kh_prod_df["Số đơn tạm ngưng"]
@@ -425,14 +355,14 @@ def render_overview_page():
         chart_df = (
             df_prod.assign(
                 PROD_CODE=lambda x: x["PROD_CODE"].where(
-                    x["PROD_CODE"].isin(_NAMED_PRODUCTS), other="Sản phẩm khác"
+                    x["PROD_CODE"].isin(NAMED_PRODUCTS), other="Sản phẩm khác"
                 )
             )
             .groupby(["PROD_CODE", "Năm"], as_index=False)["Tiền thực thu"]
             .sum()
             .assign(Năm=lambda x: x["Năm"].astype(str))
         )
-        chart_df["label"] = chart_df["Tiền thực thu"].apply(_fmt_vnd)
+        chart_df["label"] = chart_df["Tiền thực thu"].apply(fmt_currency)
         chart_df["PROD_CODE"] = chart_df["PROD_CODE"].map(lambda c: _DISPLAY_NAMES.get(c, c))
         prod_order = (
             chart_df.groupby("PROD_CODE")["Tiền thực thu"]
@@ -471,7 +401,7 @@ def render_overview_page():
     # ── Chart 2: Tiền thực thu theo tháng (bar) ───────────────────────────────
     with col_trend:
         _chart_title("Tiền thực thu theo tháng")
-        prod_options = [_DISPLAY_NAMES.get(p, p) for p in sorted(_NAMED_PRODUCTS)] + ["Sản phẩm khác"]
+        prod_options = [_DISPLAY_NAMES.get(p, p) for p in sorted(NAMED_PRODUCTS)] + ["Sản phẩm khác"]
         selected_trend_prods = st.multiselect(
             "Lọc sản phẩm",
             options=prod_options,
@@ -498,7 +428,7 @@ def render_overview_page():
             columns=["Năm", "Tháng"],
         )
         monthly_df = full_grid.merge(monthly_df, on=["Năm", "Tháng"], how="left").fillna(0)
-        monthly_df["label"] = monthly_df["Tiền thực thu"].apply(_fmt_vnd)
+        monthly_df["label"] = monthly_df["Tiền thực thu"].apply(fmt_currency)
         m_bars = (
             alt.Chart(monthly_df)
             .mark_bar()
@@ -612,7 +542,7 @@ def render_overview_page():
         new_prod_agg = (
             df_new_prod.assign(
                 PROD_CODE=lambda x: x["PROD_CODE"].where(
-                    x["PROD_CODE"].isin(_NAMED_PRODUCTS), other="Sản phẩm khác"
+                    x["PROD_CODE"].isin(NAMED_PRODUCTS), other="Sản phẩm khác"
                 )
             )
             .groupby(["PROD_CODE", "Năm"], as_index=False)[["Số đơn cấp mới", "Số đơn hủy webview"]]
@@ -678,7 +608,7 @@ def render_overview_page():
     _chart_title("Số đơn cấp mới và số đơn hủy theo tháng")
     selected_new_prods = st.multiselect(
         "Lọc sản phẩm",
-        options=[_DISPLAY_NAMES.get(p, p) for p in sorted(_NAMED_PRODUCTS)] + ["Sản phẩm khác"],
+        options=[_DISPLAY_NAMES.get(p, p) for p in sorted(NAMED_PRODUCTS)] + ["Sản phẩm khác"],
         default=[],
         placeholder="Tất cả sản phẩm",
         key="new_month_prods",

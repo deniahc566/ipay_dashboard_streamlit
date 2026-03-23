@@ -23,7 +23,20 @@ def load_ipay_data() -> pd.DataFrame:
     if not token:
         raise EnvironmentError("MOTHERDUCK_TOKEN chưa được đặt trong biến môi trường.")
     con = duckdb.connect(f"md:ipay_data?motherduck_token={token}")
-    df = con.execute("SELECT * FROM gold.ipay_quantity_rev_data").df()
+    df = con.execute("""
+        SELECT
+            PROD_CODE,
+            "Năm",
+            "Ngày phát sinh",
+            "Tiền thực thu",
+            "Số đơn cấp mới",
+            "Số đơn cấp tái tục",
+            "Số đơn tái tục dự kiến",
+            "Số đơn có hiệu lực",
+            "Số đơn tạm ngưng",
+            "Số đơn hủy webview"
+        FROM gold.ipay_quantity_rev_data
+    """).df()
     con.close()
     for col in _NUMERIC_COLS:
         if col in df.columns:

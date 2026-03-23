@@ -3,45 +3,10 @@ import pandas as pd
 import altair as alt
 
 from data_loader import load_ipay_data
-from ui_helpers import render_action_buttons
+from ui_helpers import render_action_buttons, fmt_currency, kpi_card, yoy_caption
 
 _PROD_CODE = "MIX_01"
 _PHI_DON = 3000
-
-
-def _fmt_currency(value: float) -> str:
-    billions = value / 1_000_000_000
-    if billions >= 1:
-        return f"{billions:,.2f} tỷ"
-    millions = value / 1_000_000
-    return f"{millions:,.1f} tr"
-
-
-def _kpi_card(
-    label, value, delta_str, delta_color,
-    accent_color="#2C4C7B", yoy_html="", tooltip="",
-):
-    _label_html = label
-    if tooltip:
-        _label_html += (
-            f'&nbsp;<abbr title="{tooltip}" '
-            f'style="font-size:0.65rem;color:#aaa;cursor:help;text-decoration:none;">ℹ</abbr>'
-        )
-    parts = [
-        f'<div style="background:#ffffff;border:1px solid #e0e0e0;border-radius:8px;'
-        f'padding:14px 14px 11px 10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);'
-        f'display:flex;gap:8px;align-items:stretch;min-height:126px;">',
-        f'<div style="width:4px;border-radius:3px;background:{accent_color};flex-shrink:0;"></div>',
-        f'<div style="flex:1;min-width:0;">',
-        f'<div style="font-size:0.55rem;font-weight:600;color:#555;text-transform:uppercase;'
-        f'letter-spacing:0.04em;margin-bottom:4px;">{_label_html}</div>',
-        f'<div style="font-size:1.26rem;font-weight:700;color:#1a1a2e;line-height:1.1;">{value}</div>',
-        f'<div style="margin-top:3px;font-size:0.57rem;font-weight:600;color:{delta_color};">{delta_str}</div>',
-    ]
-    if yoy_html:
-        parts.append(f'<div style="margin-top:3px;">{yoy_html}</div>')
-    parts += ['</div>', '</div>']
-    return "".join(parts)
 
 
 def render_cyber_risk_page():
@@ -158,17 +123,6 @@ def render_cyber_risk_page():
     if yoy_last_date is not None and pd.notna(yoy_last_date):
         yoy_kh = int(yoy_df[yoy_df["Ngày phát sinh"] == yoy_last_date]["Số đơn có hiệu lực"].sum())
 
-    def _yoy_caption(current_val: float, yoy_val: float, fmt_fn) -> str:
-        if yoy_val == 0:
-            return f'<span style="font-size:0.56rem;color:#888">Cùng kỳ {prev_year}: N/A</span>'
-        pct   = (current_val - yoy_val) / abs(yoy_val)
-        arrow = "▲" if pct > 0 else "▼"
-        color = "#2e7d32" if pct > 0 else "#c62828"
-        return (
-            f'<span style="font-size:0.56rem;color:#888">Cùng kỳ {prev_year}: {fmt_fn(yoy_val)}&nbsp;&nbsp;</span>'
-            f'<span style="font-size:0.56rem;font-weight:600;color:{color}">{arrow} {pct:+.1%}</span>'
-        )
-
     # ── Scorecards ────────────────────────────────────────────────────────────
     _prev_str = pd.Timestamp(prev_date).strftime("%d-%m-%Y")
     st.markdown(
@@ -181,43 +135,43 @@ def render_cyber_risk_page():
 
     with cols[0]:
         _ds = "+" if delta_tien >= 0 else ""
-        st.markdown(_kpi_card(
+        st.markdown(kpi_card(
             label="Tổng tiền thực thu",
-            value=_fmt_currency(tong_tien),
-            delta_str=f"{_ds}{_fmt_currency(delta_tien)}",
+            value=fmt_currency(tong_tien),
+            delta_str=f"{_ds}{fmt_currency(delta_tien)}",
             delta_color="#2e7d32",
             accent_color="#2C4C7B",
-            yoy_html=_yoy_caption(tong_tien, yoy_tien, _fmt_currency),
+            yoy_html=yoy_caption(tong_tien, yoy_tien, fmt_currency, prev_year),
         ), unsafe_allow_html=True)
 
     with cols[1]:
         _tg_color = "#2e7d32" if delta_tang_truong >= 0 else "#c62828"
         _tg_sign  = "+" if delta_tang_truong >= 0 else ""
-        st.markdown(_kpi_card(
+        st.markdown(kpi_card(
             label="Số KH tăng trưởng",
             value=f"{tong_tang_truong:,}",
             delta_str=f"{_tg_sign}{delta_tang_truong:,}",
             delta_color=_tg_color,
             accent_color="#6A415E",
-            yoy_html=_yoy_caption(tong_tang_truong, yoy_tang_truong, lambda v: f"{int(v):,}"),
+            yoy_html=yoy_caption(tong_tang_truong, yoy_tang_truong, lambda v: f"{int(v):,}", prev_year),
             tooltip="Cấp mới − Hủy − Tái tục dự kiến + Tái tục thực tế",
         ), unsafe_allow_html=True)
 
     with cols[2]:
         _kh_color = "#2e7d32" if delta_kh >= 0 else "#c62828"
         _kh_sign  = "+" if delta_kh >= 0 else ""
-        st.markdown(_kpi_card(
+        st.markdown(kpi_card(
             label="Tổng số KH hiện hữu",
             value=f"{kh_hien_huu:,}",
             delta_str=f"{_kh_sign}{delta_kh:,}",
             delta_color=_kh_color,
             accent_color="#22B2FA",
-            yoy_html=_yoy_caption(kh_hien_huu, yoy_kh, lambda v: f"{int(v):,}"),
+            yoy_html=yoy_caption(kh_hien_huu, yoy_kh, lambda v: f"{int(v):,}", prev_year),
         ), unsafe_allow_html=True)
 
     with cols[3]:
         _huy_color = "#c62828" if delta_ty_le > 0 else "#2e7d32"
-        st.markdown(_kpi_card(
+        st.markdown(kpi_card(
             label="Tỷ lệ hủy chủ động",
             value=f"{ty_le_huy:.1%}",
             delta_str=f"{delta_ty_le:+.2%}",
@@ -227,13 +181,13 @@ def render_cyber_risk_page():
 
     with cols[4]:
         _tt_color = "#2e7d32" if delta_tai_tuc >= 0 else "#c62828"
-        st.markdown(_kpi_card(
+        st.markdown(kpi_card(
             label="Tỷ lệ tái tục / dự kiến",
             value=f"{ty_le_tai_tuc:.1%}",
             delta_str=f"{delta_tai_tuc:+.2%}",
             delta_color=_tt_color,
             accent_color="#2C7B6F",
-            yoy_html=_yoy_caption(ty_le_tai_tuc, yoy_ty_le_tai_tuc, lambda v: f"{v:.1%}"),
+            yoy_html=yoy_caption(ty_le_tai_tuc, yoy_ty_le_tai_tuc, lambda v: f"{v:.1%}", prev_year),
         ), unsafe_allow_html=True)
 
     # ── Row 2: Charts ─────────────────────────────────────────────────────────
@@ -348,7 +302,7 @@ def render_cyber_risk_page():
             unsafe_allow_html=True,
         )
         if not _melted.empty:
-            _melted["label"] = _melted["Tiền (VND)"].apply(_fmt_currency)
+            _melted["label"] = _melted["Tiền (VND)"].apply(fmt_currency)
             _bar_order = ["Thực thu", "Dự kiến"]
             _bars = (
                 alt.Chart(_melted)

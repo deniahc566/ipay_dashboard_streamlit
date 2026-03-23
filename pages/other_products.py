@@ -3,53 +3,10 @@ import pandas as pd
 import altair as alt
 
 from data_loader import load_ipay_data
-from ui_helpers import render_action_buttons
-
-_NAMED_PRODUCTS = {"MIX_01", "VTB_HOMESAVING", "TAPCARE", "ISAFE_CYBER"}
-
-_PRODUCT_DISPLAY_NAMES = {
-    "ISAFE_CYBER":    "I-Safe",
-    "MIX_01":         "Cyber Risk",
-    "TAPCARE":        "TapCare",
-    "VTB_HOMESAVING": "HomeSaving",
-    "CN.4.1IPAY":     "Du lịch quốc tế bán kèm",
-    "CN.4.1SA":       "Du lịch quốc tế bán lẻ",
-    "CN.4.3IPAY":     "Du lịch trong nước bán kèm",
-    "CN.4.3SA":       "Du lịch trong nước bán lẻ",
-    "CN.6":           "Bảo hiểm sức khỏe",
-    "XC.1.1":         "Bảo hiểm xe máy",
-    "XE":             "Bảo hiểm ô tô",
-    "UTV":            "Ung thư vú",
-}
-
-
-def _fmt_currency(value: float) -> str:
-    billions = value / 1_000_000_000
-    if billions >= 1:
-        return f"{billions:,.2f} tỷ"
-    millions = value / 1_000_000
-    return f"{millions:,.1f} tr"
-
-
-def _kpi_card(
-    label, value, delta_str, delta_color,
-    accent_color="#2C4C7B", yoy_html="",
-):
-    parts = [
-        f'<div style="background:#ffffff;border:1px solid #e0e0e0;border-radius:8px;'
-        f'padding:14px 14px 11px 10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);'
-        f'display:flex;gap:8px;align-items:stretch;min-height:126px;">',
-        f'<div style="width:4px;border-radius:3px;background:{accent_color};flex-shrink:0;"></div>',
-        f'<div style="flex:1;min-width:0;">',
-        f'<div style="font-size:0.55rem;font-weight:600;color:#555;text-transform:uppercase;'
-        f'letter-spacing:0.04em;margin-bottom:4px;">{label}</div>',
-        f'<div style="font-size:1.26rem;font-weight:700;color:#1a1a2e;line-height:1.1;">{value}</div>',
-        f'<div style="margin-top:3px;font-size:0.57rem;font-weight:600;color:{delta_color};">{delta_str}</div>',
-    ]
-    if yoy_html:
-        parts.append(f'<div style="margin-top:3px;">{yoy_html}</div>')
-    parts += ['</div>', '</div>']
-    return "".join(parts)
+from ui_helpers import (
+    render_action_buttons, fmt_currency, kpi_card, yoy_caption,
+    NAMED_PRODUCTS, PRODUCT_DISPLAY_NAMES,
+)
 
 
 def render_other_products_page():
@@ -71,7 +28,7 @@ def render_other_products_page():
         return
 
     # Filter to "other" products only
-    prod_full_df = full_df[~full_df["PROD_CODE"].isin(_NAMED_PRODUCTS)].copy()
+    prod_full_df = full_df[~full_df["PROD_CODE"].isin(NAMED_PRODUCTS)].copy()
 
     # ── Year filter ────────────────────────────────────────────────────────────
     all_years = sorted(prod_full_df["Năm"].dropna().unique().astype(int).tolist(), reverse=True)
@@ -123,17 +80,6 @@ def render_other_products_page():
     yoy_tien    = yoy_df["Tiền thực thu"].sum()
     yoy_cap_moi = int(yoy_df["Số đơn cấp mới"].sum())
 
-    def _yoy_caption(current_val: float, yoy_val: float, fmt_fn) -> str:
-        if yoy_val == 0:
-            return f'<span style="font-size:0.56rem;color:#888">Cùng kỳ {prev_year}: N/A</span>'
-        pct   = (current_val - yoy_val) / abs(yoy_val)
-        arrow = "▲" if pct > 0 else "▼"
-        color = "#2e7d32" if pct > 0 else "#c62828"
-        return (
-            f'<span style="font-size:0.56rem;color:#888">Cùng kỳ {prev_year}: {fmt_fn(yoy_val)}&nbsp;&nbsp;</span>'
-            f'<span style="font-size:0.56rem;font-weight:600;color:{color}">{arrow} {pct:+.1%}</span>'
-        )
-
     # ── Scorecards ────────────────────────────────────────────────────────────
     _prev_str = pd.Timestamp(prev_date).strftime("%d-%m-%Y")
     st.markdown(
@@ -146,27 +92,27 @@ def render_other_products_page():
 
     with cols[0]:
         _ds = "+" if delta_tien >= 0 else ""
-        st.markdown(_kpi_card(
+        st.markdown(kpi_card(
             label="Tổng tiền thực thu",
-            value=_fmt_currency(tong_tien),
-            delta_str=f"{_ds}{_fmt_currency(delta_tien)}",
+            value=fmt_currency(tong_tien),
+            delta_str=f"{_ds}{fmt_currency(delta_tien)}",
             delta_color="#2e7d32",
             accent_color="#2C4C7B",
-            yoy_html=_yoy_caption(tong_tien, yoy_tien, _fmt_currency),
+            yoy_html=yoy_caption(tong_tien, yoy_tien, fmt_currency, prev_year),
         ), unsafe_allow_html=True)
 
     with cols[1]:
-        st.markdown(_kpi_card(
+        st.markdown(kpi_card(
             label="Tổng số đơn cấp mới",
             value=f"{tong_cap_moi:,}",
             delta_str=f"+{delta_cap_moi:,}",
             delta_color="#2e7d32",
             accent_color="#6A415E",
-            yoy_html=_yoy_caption(tong_cap_moi, yoy_cap_moi, lambda v: f"{int(v):,}"),
+            yoy_html=yoy_caption(tong_cap_moi, yoy_cap_moi, lambda v: f"{int(v):,}", prev_year),
         ), unsafe_allow_html=True)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
-    _display_names = _PRODUCT_DISPLAY_NAMES
+    _display_names = PRODUCT_DISPLAY_NAMES
 
     def _prod_label(code: str) -> str:
         return _display_names.get(code, code)
