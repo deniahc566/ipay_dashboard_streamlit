@@ -247,7 +247,7 @@ with st.sidebar:
 
     # ── Collapsible section header ────────────────────────────────────────────
     arrow = "▾" if st.session_state.vhct_open else "▸"
-    if st.button(f"Sản phẩm gắn kèm {arrow}", key="nav_vhct",
+    if st.button(f"Báo cáo chi tiết {arrow}", key="nav_vhct",
                  use_container_width=True):
         st.session_state.vhct_open = not st.session_state.vhct_open
         st.rerun()

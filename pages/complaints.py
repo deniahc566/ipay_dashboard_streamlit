@@ -339,6 +339,24 @@ def render_complaints_page():
     detail = df_detail[detail_src_cols].sort_values("received_date_time", ascending=False).copy()
     detail["received_date_time"] = detail["received_date_time"].dt.strftime("%d/%m/%Y %I:%M:%S %p")
 
+    # ── Pagination ────────────────────────────────────────────────────────────
+    PAGE_SIZE = 15
+    total_rows = len(detail)
+    total_pages = max(1, -(-total_rows // PAGE_SIZE))  # ceiling division
+
+    # Reset page when filters or date range change
+    _filter_key = (str(start_date), str(end_date), str(sorted(sel_priorities)))
+    if st.session_state.get("_kn_filter_key") != _filter_key:
+        st.session_state["_kn_filter_key"] = _filter_key
+        st.session_state["kn_page"] = 1
+
+    current_page = st.session_state.get("kn_page", 1)
+    current_page = max(1, min(current_page, total_pages))
+
+    page_start = (current_page - 1) * PAGE_SIZE
+    page_end = page_start + PAGE_SIZE
+    detail_page = detail.iloc[page_start:page_end]
+
     _DT_TH = "background:#456882;color:#fff;padding:8px 10px;text-align:left;font-weight:600;white-space:nowrap;"
     _DT_TD = "padding:7px 10px;border-bottom:1px solid #f0f0f0;vertical-align:top;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
 
@@ -350,7 +368,7 @@ def render_complaints_page():
     )
 
     rows_html = []
-    for _, row in detail.iterrows():
+    for _, row in detail_page.iterrows():
         tooltip_parts = []
         if has_request:
             v = _title_attr(row.get("customer_request", ""))
@@ -371,10 +389,27 @@ def render_complaints_page():
         rows_html.append(f'<tr title="{title_attr}" style="cursor:default;">{cells}</tr>')
 
     table_html = (
-        '<div style="overflow-x:auto;max-height:480px;overflow-y:auto;">'
+        '<div style="overflow-x:auto;">'
         '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;">'
         f"<thead><tr>{header_cells}</tr></thead>"
         f'<tbody>{"".join(rows_html)}</tbody>'
         "</table></div>"
     )
     st.markdown(table_html, unsafe_allow_html=True)
+
+    # ── Pagination controls ───────────────────────────────────────────────────
+    pc1, pc2, pc3 = st.columns([1, 3, 1])
+    with pc1:
+        if st.button("← Trước", disabled=current_page <= 1, key="kn_prev", use_container_width=True):
+            st.session_state["kn_page"] = current_page - 1
+            st.rerun()
+    with pc2:
+        st.markdown(
+            f'<p style="text-align:center;font-size:0.8rem;color:#666;margin:6px 0 0;">'
+            f'Trang {current_page} / {total_pages} &nbsp;·&nbsp; {total_rows:,} bản ghi</p>',
+            unsafe_allow_html=True,
+        )
+    with pc3:
+        if st.button("Tiếp →", disabled=current_page >= total_pages, key="kn_next", use_container_width=True):
+            st.session_state["kn_page"] = current_page + 1
+            st.rerun()
