@@ -16,7 +16,7 @@ def render_other_products_page():
     )
     st.markdown(
         '<h1 style="font-size:1.4rem;font-weight:700;white-space:nowrap;margin-bottom:0.5rem;">'
-        'BÁO CÁO SẢN PHẨM BÁN LẺ</h1>',
+        'BÁO CÁO SẢN PHẨM KHÁC</h1>',
         unsafe_allow_html=True,
     )
     render_action_buttons()
