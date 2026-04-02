@@ -435,22 +435,10 @@ def render_complaints_page():
             st.rerun()
     with pc_mid:
         st.markdown(
-            f'<p style="text-align:center;font-size:0.8rem;color:#666;margin:6px 0 4px;">'
-            f'{total_rows:,} bản ghi</p>',
+            f'<p style="text-align:center;font-size:0.8rem;color:#666;margin:6px 0 0;">'
+            f'Trang {current_page} / {total_pages} &nbsp;·&nbsp; {total_rows:,} bản ghi</p>',
             unsafe_allow_html=True,
         )
-        jumped = st.number_input(
-            f"Trang (1–{total_pages})",
-            min_value=1,
-            max_value=total_pages,
-            value=current_page,
-            step=1,
-            key="kn_page_input",
-            label_visibility="visible",
-        )
-        if jumped != current_page:
-            st.session_state["kn_page"] = int(jumped)
-            st.rerun()
     with pc_next:
         if st.button("Tiếp →", disabled=current_page >= total_pages, key="kn_next", use_container_width=True):
             st.session_state["kn_page"] = current_page + 1
