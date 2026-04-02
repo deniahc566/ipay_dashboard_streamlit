@@ -116,16 +116,44 @@ def render_complaints_page():
             value=max_date, min_value=min_date, max_value=max_date, key="kn_end",
         )
 
+    # ── Sender + Priority filters ─────────────────────────────────────────────
+    has_sender_col = "sender" in raw_df.columns
+    has_priority_col = "priority" in raw_df.columns
+
+    col_f1, col_f2, _ = st.columns([1, 1, 5])
+    with col_f1:
+        all_senders = sorted(raw_df["sender"].dropna().unique().tolist()) if has_sender_col else []
+        sel_senders = st.multiselect(
+            "Đơn vị tiếp nhận",
+            options=all_senders,
+            default=[],
+            placeholder="Tất cả",
+            key="kn_sender",
+        )
+    with col_f2:
+        all_priorities = sorted(raw_df["priority"].dropna().unique().tolist()) if has_priority_col else []
+        sel_priorities = st.multiselect(
+            "Mức độ ưu tiên",
+            options=all_priorities,
+            default=[],
+            placeholder="Tất cả",
+            key="kn_priority",
+        )
+
     mask = (raw_df["received_date_time"].dt.date >= start_date) & (
         raw_df["received_date_time"].dt.date <= end_date
     )
-    df = _expand(raw_df[mask])
+    filtered = raw_df[mask]
+    if sel_senders:
+        filtered = filtered[filtered["sender"].isin(sel_senders)]
+    if sel_priorities:
+        filtered = filtered[filtered["priority"].isin(sel_priorities)]
+    df = _expand(filtered)
 
     # ── KPI cards ────────────────────────────────────────────────────────────
     total_kn = len(df)
 
     # "Cao" priority count — match any value containing "cao" (case-insensitive)
-    has_priority_col = "priority" in df.columns
     if has_priority_col:
         kn_cao = df["priority"].str.lower().str.contains("cao", na=False).sum()
     else:
@@ -308,21 +336,7 @@ def render_complaints_page():
         unsafe_allow_html=True,
     )
 
-    # Priority filter — only applies to this detail table
-    all_priorities = sorted(raw_df["priority"].dropna().unique().tolist()) if has_priority_col else []
-    fi_col, _ = st.columns([2, 5])
-    with fi_col:
-        sel_priorities = st.multiselect(
-            "Lọc theo Mức độ ưu tiên",
-            options=all_priorities,
-            default=[],
-            placeholder="Tất cả",
-            key="kn_priority",
-        )
-
     df_detail = df.copy()
-    if sel_priorities:
-        df_detail = df_detail[df_detail["priority"].isin(sel_priorities)]
 
     has_request = "customer_request" in df_detail.columns
     has_cause = "cause" in df_detail.columns
@@ -345,7 +359,7 @@ def render_complaints_page():
     total_pages = max(1, -(-total_rows // PAGE_SIZE))  # ceiling division
 
     # Reset page when filters or date range change
-    _filter_key = (str(start_date), str(end_date), str(sorted(sel_priorities)))
+    _filter_key = (str(start_date), str(end_date), str(sorted(sel_senders)), str(sorted(sel_priorities)))
     if st.session_state.get("_kn_filter_key") != _filter_key:
         st.session_state["_kn_filter_key"] = _filter_key
         st.session_state["kn_page"] = 1
