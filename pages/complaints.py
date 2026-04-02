@@ -424,18 +424,38 @@ def render_complaints_page():
     st.markdown(table_html, unsafe_allow_html=True)
 
     # ── Pagination controls ───────────────────────────────────────────────────
-    pc1, pc2, pc3 = st.columns([1, 3, 1])
-    with pc1:
+    pc_first, pc_prev, pc_mid, pc_next, pc_last = st.columns([1, 1, 3, 1, 1])
+    with pc_first:
+        if st.button("⏮ Đầu", disabled=current_page <= 1, key="kn_first", use_container_width=True):
+            st.session_state["kn_page"] = 1
+            st.rerun()
+    with pc_prev:
         if st.button("← Trước", disabled=current_page <= 1, key="kn_prev", use_container_width=True):
             st.session_state["kn_page"] = current_page - 1
             st.rerun()
-    with pc2:
+    with pc_mid:
         st.markdown(
-            f'<p style="text-align:center;font-size:0.8rem;color:#666;margin:6px 0 0;">'
-            f'Trang {current_page} / {total_pages} &nbsp;·&nbsp; {total_rows:,} bản ghi</p>',
+            f'<p style="text-align:center;font-size:0.8rem;color:#666;margin:6px 0 4px;">'
+            f'{total_rows:,} bản ghi</p>',
             unsafe_allow_html=True,
         )
-    with pc3:
+        jumped = st.number_input(
+            f"Trang (1–{total_pages})",
+            min_value=1,
+            max_value=total_pages,
+            value=current_page,
+            step=1,
+            key="kn_page_input",
+            label_visibility="visible",
+        )
+        if jumped != current_page:
+            st.session_state["kn_page"] = int(jumped)
+            st.rerun()
+    with pc_next:
         if st.button("Tiếp →", disabled=current_page >= total_pages, key="kn_next", use_container_width=True):
             st.session_state["kn_page"] = current_page + 1
+            st.rerun()
+    with pc_last:
+        if st.button("Cuối ⏭", disabled=current_page >= total_pages, key="kn_last", use_container_width=True):
+            st.session_state["kn_page"] = total_pages
             st.rerun()
