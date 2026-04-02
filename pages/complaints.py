@@ -228,9 +228,21 @@ def render_complaints_page():
 
     st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
 
-    # ── Row 1: 3 bar charts ──────────────────────────────────────────────────
+    # ── Row 1: 4 bar charts ──────────────────────────────────────────────────
     num_days = max((end_date - start_date).days, 1)
-    r1c1, r1c2, r1c3 = st.columns(3)
+    r1c0, r1c1, r1c2, r1c3 = st.columns(4)
+
+    with r1c0:
+        st.markdown(
+            '<p style="font-weight:600;font-size:0.85rem;margin-bottom:4px;">'
+            "Số khiếu nại theo mức độ ưu tiên</p>",
+            unsafe_allow_html=True,
+        )
+        if has_priority_col and not df.empty:
+            pri_count = df.groupby("priority").size().reset_index(name="count").sort_values("count", ascending=False)
+            st.altair_chart(_bar_with_label(pri_count, "priority", "count", height=220), use_container_width=True)
+        else:
+            st.info("Không có dữ liệu mức độ ưu tiên.")
 
     with r1c1:
         st.markdown(
