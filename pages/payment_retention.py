@@ -285,10 +285,12 @@ def _render_cohort_heatmap(df_ky: pd.DataFrame, products: list[str]):
     if "chua_thu_qua_han" not in wide.columns:
         wide["chua_thu_qua_han"] = 0
 
-    wide["tong"] = wide["da_thu"] + wide["chua_thu_qua_han"]
-    da_thu = wide["da_thu"].astype("float64")
-    tong   = wide["tong"].astype("float64")
-    wide["ty_le"] = (da_thu / tong.where(tong > 0)).round(4)
+    import numpy as np
+    da_thu = np.array(wide["da_thu"].fillna(0), dtype=float)
+    chua   = np.array(wide["chua_thu_qua_han"].fillna(0), dtype=float)
+    tong   = da_thu + chua
+    wide["tong"] = tong
+    wide["ty_le"] = np.where(tong > 0, np.round(da_thu / np.where(tong > 0, tong, 1.0), 4), np.nan)
     wide["cohort_str"] = wide["cohort_month"].dt.strftime("%Y-%m")
     wide["ty_le_pct_str"] = wide["ty_le"].apply(lambda x: f"{x*100:.1f}%" if pd.notna(x) else "—")
 
