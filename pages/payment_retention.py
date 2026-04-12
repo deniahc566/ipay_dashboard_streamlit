@@ -574,6 +574,191 @@ def _render_dom_heatmap(df_date: pd.DataFrame, products: list[str], min_gcn: int
         st.altair_chart(ret_chart, use_container_width=True)
 
 
+# ── Tab 5: Detail Tables ─────────────────────────────────────────────────────
+
+def _render_detail_tables(
+    df_ky: pd.DataFrame,
+    df_month: pd.DataFrame,
+    df_date: pd.DataFrame,
+    products: list[str],
+) -> None:
+
+    # ── Bảng 1: Cohort × Kỳ (df_ky) ─────────────────────────────────────────
+    st.markdown("#### Tỉ lệ thu phí theo cohort hiệu lực × kỳ")
+
+    b1c1, b1c2, b1c3 = st.columns([2, 2, 2])
+    with b1c1:
+        ky_products = st.multiselect(
+            "Sản phẩm",
+            options=products,
+            default=products,
+            key="dt_ky_products",
+        )
+    with b1c2:
+        all_cohorts = sorted(df_ky["cohort_month"].dt.strftime("%Y-%m").unique())
+        ky_cohorts = st.multiselect(
+            "Cohort (tháng hiệu lực)",
+            options=all_cohorts,
+            default=all_cohorts[-6:] if len(all_cohorts) >= 6 else all_cohorts,
+            key="dt_ky_cohorts",
+        )
+    with b1c3:
+        ky_ky = st.multiselect(
+            "Kỳ",
+            options=list(range(2, 13)),
+            default=list(range(2, 13)),
+            key="dt_ky_ky",
+            format_func=lambda k: f"Kỳ {k}",
+        )
+
+    df_ky_f = df_ky[
+        df_ky["san_pham"].isin(ky_products)
+        & df_ky["cohort_month"].dt.strftime("%Y-%m").isin(ky_cohorts)
+        & df_ky["ky"].isin(ky_ky)
+    ].copy()
+
+    if df_ky_f.empty:
+        st.info("Không có dữ liệu.")
+    else:
+        wide = df_ky_f.pivot_table(
+            index=["san_pham", "cohort_month", "ky"],
+            columns="trang_thai",
+            values="so_gcn",
+            aggfunc="sum",
+        ).fillna(0).reset_index()
+        wide.columns.name = None
+        if "da_thu" not in wide.columns:
+            wide["da_thu"] = 0
+        if "chua_thu_qua_han" not in wide.columns:
+            wide["chua_thu_qua_han"] = 0
+        wide["tong"] = wide["da_thu"] + wide["chua_thu_qua_han"]
+        wide["ty_le_thu (%)"] = (
+            wide["da_thu"] / wide["tong"].replace(0, float("nan")) * 100
+        ).round(1)
+        wide["cohort_month"] = wide["cohort_month"].dt.strftime("%Y-%m")
+        wide = wide.rename(columns={
+            "san_pham": "Sản phẩm",
+            "cohort_month": "Cohort",
+            "ky": "Kỳ",
+            "da_thu": "Đã thu",
+            "chua_thu_qua_han": "Chưa thu (quá hạn)",
+            "tong": "Tổng",
+        }).sort_values(["Sản phẩm", "Cohort", "Kỳ"])
+        st.dataframe(wide, use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ── Bảng 2: Retention theo tháng thu (df_month) ───────────────────────────
+    st.markdown("#### Retention tháng-qua-tháng")
+
+    b2c1, b2c2, b2c3 = st.columns([2, 2, 2])
+    with b2c1:
+        mo_products = st.multiselect(
+            "Sản phẩm",
+            options=products,
+            default=products,
+            key="dt_mo_products",
+        )
+    with b2c2:
+        mo_min, mo_max = (
+            df_month["thang_tra_ky_k"].min().date(),
+            df_month["thang_tra_ky_k"].max().date(),
+        )
+        mo_range = st.date_input(
+            "Khoảng tháng",
+            value=(mo_min, mo_max),
+            min_value=mo_min,
+            max_value=mo_max,
+            key="dt_mo_range",
+        )
+    with b2c3:
+        mo_ky = st.multiselect(
+            "Kỳ",
+            options=list(range(2, 12)),
+            default=list(range(2, 12)),
+            key="dt_mo_ky",
+            format_func=lambda k: f"Kỳ {k}→{k+1}",
+        )
+
+    df_month_f = df_month[df_month["san_pham"].isin(mo_products) & df_month["ky"].isin(mo_ky)].copy()
+    if isinstance(mo_range, (list, tuple)) and len(mo_range) == 2:
+        df_month_f = df_month_f[
+            df_month_f["thang_tra_ky_k"].between(
+                pd.Timestamp(mo_range[0]), pd.Timestamp(mo_range[1])
+            )
+        ]
+
+    if df_month_f.empty:
+        st.info("Không có dữ liệu.")
+    else:
+        out = df_month_f.copy()
+        out["thang_tra_ky_k"] = out["thang_tra_ky_k"].dt.strftime("%Y-%m")
+        out = out.rename(columns={
+            "san_pham": "Sản phẩm",
+            "thang_tra_ky_k": "Tháng thu kỳ k",
+            "ky": "Kỳ k",
+            "so_gcn": "GCN trả kỳ k",
+            "ty_le_giu_chan_pct": "Giữ chân (%)",
+        }).sort_values(["Sản phẩm", "Tháng thu kỳ k", "Kỳ k"])
+        st.dataframe(out, use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ── Bảng 3: Retention theo ngày (df_date) ────────────────────────────────
+    st.markdown("#### Retention theo ngày")
+
+    b3c1, b3c2, b3c3 = st.columns([2, 2, 2])
+    with b3c1:
+        da_products = st.multiselect(
+            "Sản phẩm",
+            options=products,
+            default=products,
+            key="dt_da_products",
+        )
+    with b3c2:
+        da_min, da_max = (
+            df_date["ngay_tra_ky_k"].min().date(),
+            df_date["ngay_tra_ky_k"].max().date(),
+        )
+        da_range = st.date_input(
+            "Khoảng ngày",
+            value=(da_min, da_max),
+            min_value=da_min,
+            max_value=da_max,
+            key="dt_da_range",
+        )
+    with b3c3:
+        da_ky = st.multiselect(
+            "Kỳ",
+            options=list(range(2, 12)),
+            default=list(range(2, 12)),
+            key="dt_da_ky",
+            format_func=lambda k: f"Kỳ {k}→{k+1}",
+        )
+
+    df_date_f = df_date[df_date["san_pham"].isin(da_products) & df_date["ky"].isin(da_ky)].copy()
+    if isinstance(da_range, (list, tuple)) and len(da_range) == 2:
+        df_date_f = df_date_f[
+            df_date_f["ngay_tra_ky_k"].between(
+                pd.Timestamp(da_range[0]), pd.Timestamp(da_range[1])
+            )
+        ]
+
+    if df_date_f.empty:
+        st.info("Không có dữ liệu.")
+    else:
+        out = df_date_f.copy()
+        out["ngay_tra_ky_k"] = out["ngay_tra_ky_k"].dt.strftime("%d/%m/%Y")
+        out = out.rename(columns={
+            "san_pham": "Sản phẩm",
+            "ngay_tra_ky_k": "Ngày thu kỳ k",
+            "ky": "Kỳ k",
+            "so_gcn": "GCN trả kỳ k",
+            "ty_le_giu_chan_pct": "Giữ chân (%)",
+        }).sort_values(["Sản phẩm", "Ngày thu kỳ k", "Kỳ k"])
+        st.dataframe(out, use_container_width=True, hide_index=True)
+
+
 # ── Main render ───────────────────────────────────────────────────────────────
 
 def render_payment_retention_page():
@@ -650,11 +835,12 @@ def render_payment_retention_page():
     st.divider()
 
     # ── 4 tabs ────────────────────────────────────────────────────────────────
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "📊 Cohort Heatmap",
-        "📈 Retention Curve",
-        "📉 Xu hướng theo ngày",
-        "📅 Phân bố ngày trong tháng",
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "Cohort Heatmap",
+        "Retention Curve",
+        "Xu hướng theo ngày",
+        "Phân bố ngày trong tháng",
+        "Dữ liệu chi tiết",
     ])
 
     with tab1:
@@ -668,3 +854,6 @@ def render_payment_retention_page():
 
     with tab4:
         _render_dom_heatmap(df_date, selected_products, min_gcn)
+
+    with tab5:
+        _render_detail_tables(df_ky, df_month, df_date, selected_products)
