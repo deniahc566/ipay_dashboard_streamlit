@@ -344,11 +344,13 @@ def _render_retention_curve(df_month: pd.DataFrame, products: list[str], min_gcn
         st.info("Không có dữ liệu.")
         return
 
-    # Chỉ lấy tháng đủ cũ để kỳ k+1 có thể đã xảy ra (tháng < tháng hiện tại)
-    cutoff = pd.Timestamp.now().normalize() - pd.DateOffset(months=1)
+    # Tháng M đủ mature khi ngày cuối tháng + 30 ngày đã qua
+    # (đảm bảo kỳ k+1 có đủ thời gian để được thu)
+    # Điều kiện: last_day(M) + 30 ngày <= hôm nay ≈ M_start + 60 ngày <= hôm nay
+    cutoff = pd.Timestamp.now().normalize() - pd.Timedelta(days=60)
     df_old = df[df["thang_tra_ky_k"] <= cutoff].copy()
     if df_old.empty:
-        st.info("Chưa đủ dữ liệu lịch sử (cần ít nhất 1 tháng cũ).")
+        st.info("Chưa đủ dữ liệu lịch sử (cần ít nhất 1 tháng đủ mature).")
         return
 
     df_old["thang_str"] = df_old["thang_tra_ky_k"].dt.strftime("%Y-%m")
