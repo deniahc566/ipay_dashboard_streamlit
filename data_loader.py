@@ -112,16 +112,28 @@ def load_portfolio_health() -> pd.DataFrame:
             WITH normalized_payments AS (
                 SELECT
                     CASE "Sản phẩm"
-                        WHEN 'ISafe'      THEN 'I-Safe'
-                        WHEN 'homesaving' THEN 'HomeSaving'
+                        WHEN 'iSafe'                   THEN 'I-Safe'
+                        WHEN 'isafe'                   THEN 'I-Safe'
+                        WHEN 'I-Safe'                  THEN 'I-Safe'
+                        WHEN 'ISafe'                   THEN 'I-Safe'
+                        WHEN 'homesaving'              THEN 'HomeSaving'
+                        WHEN 'HomeSaving'              THEN 'HomeSaving'
+                        WHEN 'cyberisk'                THEN 'Cyber Risk'
+                        WHEN 'Cyber Individual - iPay' THEN 'Cyber Risk'
+                        WHEN 'Cyber Risk'              THEN 'Cyber Risk'
+                        WHEN 'TAPCARE'                 THEN 'TapCare'
+                        WHEN 'phonecare'               THEN 'TapCare'
+                        WHEN 'TapCare'                 THEN 'TapCare'
                         ELSE "Sản phẩm"
                     END AS san_pham,
                     "Số hợp đồng VBI"                               AS so_hd,
                     DATE_TRUNC('month', "Ngày thu phí")             AS thang
                 FROM bronze.payment_data
                 WHERE "Sản phẩm" IN (
-                    'Cyber Risk','I-Safe','ISafe',
-                    'HomeSaving','homesaving','TapCare'
+                    'Cyber Risk','cyberisk','Cyber Individual - iPay',
+                    'I-Safe','iSafe','isafe','ISafe',
+                    'HomeSaving','homesaving',
+                    'TapCare','TAPCARE','phonecare'
                 )
                   AND "Ngày thu phí" IS NOT NULL
             ),

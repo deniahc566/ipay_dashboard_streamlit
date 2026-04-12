@@ -58,10 +58,12 @@ def _scorecard_metrics(
     """Tính toán các chỉ số tổng hợp cho scorecard."""
     fky = df_ky[df_ky["san_pham"].isin(products)]
 
-    # Q1 — Hiệu quả thu trong kỳ: chỉ dùng cohort 2–8 tháng trước
-    # Tránh: cohort quá mới (chưa hết window thu) và cohort quá cũ (survivor bias)
+    # Q1 — Hiệu quả thu trong kỳ: chỉ dùng cohort 3–8 tháng trước
+    # Tránh: cohort quá mới (kỳ 2 đến hạn cohort+60 ngày, cần thêm 30 ngày buffer
+    #        → cần cohort cũ hơn 90 ngày / 3 tháng để không bị recency bias)
+    #        cohort quá cũ (survivor bias)
     cohort_min = (pd.Timestamp.now() - pd.DateOffset(months=8)).to_period("M").to_timestamp()
-    cohort_max = (pd.Timestamp.now() - pd.DateOffset(months=2)).to_period("M").to_timestamp()
+    cohort_max = (pd.Timestamp.now() - pd.DateOffset(months=3)).to_period("M").to_timestamp()
     fky_q1 = fky[fky["cohort_month"].between(cohort_min, cohort_max)]
 
     da_thu  = fky_q1.loc[fky_q1["trang_thai"] == "da_thu",           "so_gcn"].sum()
@@ -178,11 +180,11 @@ def _render_scorecard(
             delta_str=ty_le_delta_str or "—",
             delta_color=ty_le_delta_color,
             accent_color="#1565C0",
-            subtitle=f"Nhóm HĐ hiệu lực 2–8 tháng trước · {m['da_thu']:,}/{m['tong']:,} HĐ",
+            subtitle=f"Nhóm HĐ hiệu lực 3–8 tháng trước · {m['da_thu']:,}/{m['tong']:,} HĐ",
             tooltip="Trong số các hợp đồng đã đến hạn phải trả kỳ này, "
                     "bao nhiêu % thực sự đã trả? "
-                    "Chỉ tính nhóm hiệu lực 2–8 tháng trước để loại bỏ "
-                    "nhóm quá mới (chưa đủ thời gian thu) và nhóm quá cũ (ít biến động).",
+                    "Chỉ tính nhóm hiệu lực 3–8 tháng trước để loại bỏ "
+                    "nhóm quá mới (kỳ 2 chưa đủ thời gian thu, cần 90 ngày) và nhóm quá cũ (ít biến động).",
         ), unsafe_allow_html=True)
 
     # Card 2: HĐ quá hạn
@@ -271,7 +273,7 @@ def _render_scorecard(
     with st.expander("Chi tiết theo sản phẩm", expanded=True):
         rows = []
         cohort_min = (pd.Timestamp.now() - pd.DateOffset(months=8)).to_period("M").to_timestamp()
-        cohort_max = (pd.Timestamp.now() - pd.DateOffset(months=2)).to_period("M").to_timestamp()
+        cohort_max = (pd.Timestamp.now() - pd.DateOffset(months=3)).to_period("M").to_timestamp()
         cutoff_month = (pd.Timestamp.now() - pd.DateOffset(months=1)).to_period("M").to_timestamp()
         mature_month = (
             (pd.Timestamp.now().normalize() - pd.Timedelta(days=60))
@@ -279,7 +281,7 @@ def _render_scorecard(
         )
 
         for sp in sorted(products):
-            # Q1: chỉ dùng cohort 2–8 tháng trước
+            # Q1: chỉ dùng cohort 3–8 tháng trước
             sp_ky = df_ky[
                 (df_ky["san_pham"] == sp)
                 & df_ky["cohort_month"].between(cohort_min, cohort_max)
@@ -351,7 +353,7 @@ def _render_q1_tab(df_ky: pd.DataFrame, products: list[str]) -> None:
     st.markdown("##### Xu hướng tỉ lệ thu theo tháng")
     st.caption(
         "Tỉ lệ thu tổng hợp (kỳ 2+) theo tháng HĐ hiệu lực. "
-        "Tháng gần nhất bị ẩn vì chưa đủ dữ liệu (HĐ chưa đến hạn kỳ 2)."
+        "3 tháng gần nhất bị ẩn: kỳ 2 đến hạn sau 60 ngày, cần thêm ~30 ngày để collection hoàn tất."
     )
 
     grp = (
@@ -377,8 +379,10 @@ def _render_q1_tab(df_ky: pd.DataFrame, products: list[str]) -> None:
     wide["da_thu_fmt"]  = wide["da_thu"].apply(lambda x: f"{int(x):,}")
     wide["qua_han_fmt"] = wide["chua_thu_qua_han"].apply(lambda x: f"{int(x):,}")
 
-    # Exclude cohorts < 2 months old — incomplete window
-    cutoff_new = (pd.Timestamp.now() - pd.DateOffset(months=2)).to_period("M").to_timestamp()
+    # Exclude cohorts < 3 months old — kỳ 2 đến hạn tại cohort+60 ngày,
+    # cần thêm ~30 ngày buffer thu → cohort phải cũ hơn 90 ngày (3 tháng)
+    # để tránh recency bias (cohort quá mới chưa kịp thu kỳ 2 bị ghi là chua_thu_qua_han)
+    cutoff_new = (pd.Timestamp.now() - pd.DateOffset(months=3)).to_period("M").to_timestamp()
     wide_trend = wide[wide["cohort_month"] <= cutoff_new].copy()
 
     trend_chart = (
