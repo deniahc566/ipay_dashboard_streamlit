@@ -14,11 +14,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 
-from data_loader import (
-    load_payment_tracking_by_ky,
-    load_payment_tracking_by_month,
-    load_payment_tracking_by_date,
-)
+from data_loader import load_all_payment_tracking
 from ui_helpers import kpi_card
 
 _PRODUCTS = ["Cyber Risk", "HomeSaving", "I-Safe", "TapCare"]
@@ -557,12 +553,16 @@ def _render_dom_heatmap(df_date: pd.DataFrame, products: list[str], min_gcn: int
         st.altair_chart(vol_chart, use_container_width=True)
 
     with col_right:
+        r_min = dom["avg_retention"].min()
+        r_max = dom["avg_retention"].max()
+        # Stretch domain to actual data range so variation is visible
+        r_domain = [r_min, r_max] if r_max > r_min else [max(0, r_min - 0.01), r_max]
         ret_chart = base.mark_rect(stroke="white", strokeWidth=0.3).encode(
             color=alt.Color(
                 "avg_retention:Q",
-                scale=_retention_color_scale(),
+                scale=alt.Scale(scheme="redyellowgreen", domain=r_domain, clamp=True),
                 title="Giữ chân avg (%)",
-                legend=alt.Legend(format=".0f"),
+                legend=alt.Legend(format=".2f"),
             ),
             tooltip=[
                 alt.Tooltip("ngay_trong_thang:O", title="Ngày"),
@@ -585,9 +585,7 @@ def render_payment_retention_page():
 
     # ── Load data ─────────────────────────────────────────────────────────────
     try:
-        df_ky    = load_payment_tracking_by_ky()
-        df_month = load_payment_tracking_by_month()
-        df_date  = load_payment_tracking_by_date()
+        df_ky, df_month, df_date = load_all_payment_tracking()
     except Exception as e:
         st.error(f"Không thể tải dữ liệu: {e}")
         st.info(
