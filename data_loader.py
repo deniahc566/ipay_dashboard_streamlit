@@ -3,15 +3,9 @@ import sys
 import duckdb
 import pandas as pd
 import streamlit as st
-from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
-
-# Local DuckDB path — resolve relative to this file's project root
-_LOCAL_DB = str(
-    Path(__file__).parent.parent / "Data" / "db" / "bhtt_ipay.db"
-).replace("\\", "/")
 
 _NUMERIC_COLS = [
     "Tiền thực thu",
@@ -66,7 +60,10 @@ def load_complaints_data() -> pd.DataFrame:
 @st.cache_data(ttl=300)
 def load_payment_tracking_by_ky() -> pd.DataFrame:
     """silver.payment_tracking_by_ky — cohort hiệu lực × kỳ × da_thu/chua_thu_qua_han."""
-    con = duckdb.connect(_LOCAL_DB, read_only=True)
+    token = os.environ.get("MOTHERDUCK_TOKEN")
+    if not token:
+        raise EnvironmentError("MOTHERDUCK_TOKEN chưa được đặt trong biến môi trường.")
+    con = duckdb.connect(f"md:ipay_data?motherduck_token={token}")
     df = con.execute("SELECT * FROM silver.payment_tracking_by_ky").df()
     con.close()
     df["cohort_month"] = pd.to_datetime(df["cohort_month"])
@@ -76,7 +73,10 @@ def load_payment_tracking_by_ky() -> pd.DataFrame:
 @st.cache_data(ttl=300)
 def load_payment_tracking_by_month() -> pd.DataFrame:
     """silver.payment_tracking_by_payment_month — retention tháng-qua-tháng."""
-    con = duckdb.connect(_LOCAL_DB, read_only=True)
+    token = os.environ.get("MOTHERDUCK_TOKEN")
+    if not token:
+        raise EnvironmentError("MOTHERDUCK_TOKEN chưa được đặt trong biến môi trường.")
+    con = duckdb.connect(f"md:ipay_data?motherduck_token={token}")
     df = con.execute("SELECT * FROM silver.payment_tracking_by_payment_month").df()
     con.close()
     df["thang_tra_ky_k"] = pd.to_datetime(df["thang_tra_ky_k"])
@@ -86,7 +86,10 @@ def load_payment_tracking_by_month() -> pd.DataFrame:
 @st.cache_data(ttl=300)
 def load_payment_tracking_by_date() -> pd.DataFrame:
     """silver.payment_tracking_by_payment_date — retention theo ngày."""
-    con = duckdb.connect(_LOCAL_DB, read_only=True)
+    token = os.environ.get("MOTHERDUCK_TOKEN")
+    if not token:
+        raise EnvironmentError("MOTHERDUCK_TOKEN chưa được đặt trong biến môi trường.")
+    con = duckdb.connect(f"md:ipay_data?motherduck_token={token}")
     df = con.execute("SELECT * FROM silver.payment_tracking_by_payment_date").df()
     con.close()
     df["ngay_tra_ky_k"] = pd.to_datetime(df["ngay_tra_ky_k"])
