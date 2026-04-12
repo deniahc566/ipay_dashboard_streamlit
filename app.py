@@ -15,6 +15,7 @@ from pages.tapcare import render_tapcare_page
 from pages.homesaving import render_homesaving_page
 from pages.other_products import render_other_products_page
 from pages.complaints import render_complaints_page
+from pages.payment_retention import render_payment_retention_page
 
 st.set_page_config(
     page_title="VBI iPay Dashboard",
@@ -270,6 +271,10 @@ with st.sidebar:
             st.session_state.page = "Sản phẩm khác"
             st.rerun()
 
+    if st.button("Thu phí & Retention", key="nav_retention", use_container_width=True):
+        st.session_state.page = "Thu phí & Retention"
+        st.rerun()
+
     if st.button("Báo cáo CSKH", key="nav_complaints", use_container_width=True):
         st.session_state.page = "Khiếu nại"
         st.rerun()
@@ -288,6 +293,8 @@ elif page == "Nhà và bạn":
     render_homesaving_page()
 elif page == "Sản phẩm khác":
     render_other_products_page()
+elif page == "Thu phí & Retention":
+    render_payment_retention_page()
 elif page == "Khiếu nại":
     render_complaints_page()
 else:
