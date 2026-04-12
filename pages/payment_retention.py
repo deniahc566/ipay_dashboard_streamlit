@@ -14,7 +14,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 
-from data_loader import load_all_payment_tracking
+from data_loader import load_all_payment_tracking, load_portfolio_health
 from ui_helpers import kpi_card
 
 _PRODUCTS = ["Cyber Risk", "HomeSaving", "I-Safe", "TapCare"]
@@ -49,22 +49,29 @@ def _scorecard_metrics(
     df_ky: pd.DataFrame,
     df_month: pd.DataFrame,
     df_date: pd.DataFrame,
+    df_health: pd.DataFrame,
     products: list[str],
 ) -> dict:
     """Tính toán các chỉ số tổng hợp cho scorecard."""
     fky = df_ky[df_ky["san_pham"].isin(products)]
 
-    da_thu   = fky.loc[fky["trang_thai"] == "da_thu",           "so_gcn"].sum()
-    qua_han  = fky.loc[fky["trang_thai"] == "chua_thu_qua_han", "so_gcn"].sum()
-    tong     = da_thu + qua_han
-    ty_le    = da_thu / tong * 100 if tong > 0 else 0.0
+    # Q1 — Hiệu quả thu trong kỳ: chỉ dùng cohort 2–8 tháng trước
+    # Tránh: cohort quá mới (chưa hết window thu) và cohort quá cũ (survivor bias)
+    cohort_min = (pd.Timestamp.now() - pd.DateOffset(months=8)).to_period("M").to_timestamp()
+    cohort_max = (pd.Timestamp.now() - pd.DateOffset(months=2)).to_period("M").to_timestamp()
+    fky_q1 = fky[fky["cohort_month"].between(cohort_min, cohort_max)]
 
-    # Delta tỉ lệ thu: cohort mới nhất vs cohort trước đó
-    cohorts = sorted(fky["cohort_month"].unique())
+    da_thu  = fky_q1.loc[fky_q1["trang_thai"] == "da_thu",           "so_gcn"].sum()
+    qua_han = fky_q1.loc[fky_q1["trang_thai"] == "chua_thu_qua_han", "so_gcn"].sum()
+    tong    = da_thu + qua_han
+    ty_le   = da_thu / tong * 100 if tong > 0 else 0.0
+
+    # Delta Q1: 2 cohort gần nhất trong window
+    cohorts = sorted(fky_q1["cohort_month"].unique())
     ty_le_delta = None
     if len(cohorts) >= 2:
         def _rate(cohort):
-            sub = fky[fky["cohort_month"] == cohort]
+            sub = fky_q1[fky_q1["cohort_month"] == cohort]
             d = sub.loc[sub["trang_thai"] == "da_thu",           "so_gcn"].sum()
             c = sub.loc[sub["trang_thai"] == "chua_thu_qua_han", "so_gcn"].sum()
             return d / (d + c) * 100 if (d + c) > 0 else None
@@ -111,12 +118,33 @@ def _scorecard_metrics(
     # Avg retention tổng kỳ 2–11 (mature)
     ret_overall = fm_all["ty_le_giu_chan_pct"].mean() if not fm_all.empty else None
 
+    # Q2 — Sức khỏe danh mục: distinct GCN đang đóng phí / GCN có hiệu lực
+    # Dùng tháng mature gần nhất (60 ngày trước để đảm bảo đủ data)
+    mature_month = (
+        (pd.Timestamp.now().normalize() - pd.Timedelta(days=60))
+        .to_period("M").to_timestamp()
+    )
+    dh = df_health[
+        df_health["san_pham"].isin(products)
+        & (df_health["thang"] == mature_month)
+    ]
+    active_gcn     = int(dh["distinct_gcn"].sum()) if not dh.empty else None
+    active_hieu_luc = int(dh["hieu_luc"].sum())    if not dh.empty and dh["hieu_luc"].notna().any() else None
+    ty_le_active   = (
+        active_gcn / active_hieu_luc * 100
+        if active_gcn and active_hieu_luc and active_hieu_luc > 0
+        else None
+    )
+    active_month_label = mature_month.strftime("%m/%Y")
+
     return dict(
         da_thu=int(da_thu), qua_han=int(qua_han), tong=int(tong),
         ty_le=ty_le, ty_le_delta=ty_le_delta,
         ret_ky2=ret_ky2, ret_delta=ret_delta,
         ret_overall=ret_overall,
         dropoff_ky=dropoff_ky, dropoff_val=dropoff_val,
+        active_gcn=active_gcn, active_hieu_luc=active_hieu_luc,
+        ty_le_active=ty_le_active, active_month_label=active_month_label,
     )
 
 
@@ -124,12 +152,13 @@ def _render_scorecard(
     df_ky: pd.DataFrame,
     df_month: pd.DataFrame,
     df_date: pd.DataFrame,
+    df_health: pd.DataFrame,
     products: list[str],
 ) -> None:
-    m = _scorecard_metrics(df_ky, df_month, df_date, products)
+    m = _scorecard_metrics(df_ky, df_month, df_date, df_health, products)
 
-    # ── Row 1: 4 KPI cards ────────────────────────────────────────────────────
-    c1, c2, c3, c4 = st.columns(4)
+    # ── Row 1: 5 KPI cards ────────────────────────────────────────────────────
+    c1, c2, c3, c4, c5 = st.columns(5)
 
     # Card 1: Tỉ lệ thu phí
     ty_le_delta_str = ""
@@ -141,13 +170,15 @@ def _render_scorecard(
 
     with c1:
         st.markdown(kpi_card(
-            label="TỈ LỆ THU PHÍ",
+            label="HIỆU QUẢ THU PHÍ",
             value=f"{m['ty_le']:.1f}%",
             delta_str=ty_le_delta_str or "—",
             delta_color=ty_le_delta_color,
             accent_color="#1565C0",
-            subtitle=f"{m['da_thu']:,} / {m['tong']:,} GCN-kỳ",
-            tooltip="da_thu / (da_thu + chua_thu_qua_han) theo cohort hiệu lực",
+            subtitle=f"Cohort 2–8 tháng trước · {m['da_thu']:,}/{m['tong']:,} GCN-kỳ",
+            tooltip="da_thu / (da_thu + quá hạn), chỉ tính cohort hiệu lực 2–8 tháng trước "
+                    "để tránh bias từ cohort quá mới (chưa đủ thời gian thu) "
+                    "hoặc quá cũ (survivor bias).",
         ), unsafe_allow_html=True)
 
     # Card 2: GCN quá hạn
@@ -202,17 +233,53 @@ def _render_scorecard(
             tooltip="Kỳ k→k+1 có avg retention thấp nhất (tháng mature, kỳ 2–11)",
         ), unsafe_allow_html=True)
 
+    # Card 5: Q2 — Sức khỏe danh mục
+    with c5:
+        if m["ty_le_active"] is not None:
+            active_val   = f"{m['ty_le_active']:.1f}%"
+            active_sub   = (
+                f"Tháng {m['active_month_label']} · "
+                f"{m['active_gcn']:,} / {m['active_hieu_luc']:,} GCN"
+            )
+            active_color = (
+                "#2e7d32" if m["ty_le_active"] >= 70
+                else "#e65100" if m["ty_le_active"] >= 50
+                else "#c62828"
+            )
+        else:
+            active_val   = "—"
+            active_sub   = "Chưa đủ dữ liệu"
+            active_color = "#888"
+        st.markdown(kpi_card(
+            label="SỨC KHỎE DANH MỤC",
+            value=active_val,
+            delta_str=active_sub,
+            delta_color=active_color,
+            accent_color="#6a1b9a",
+            subtitle="Distinct GCN đóng phí / GCN có hiệu lực",
+            tooltip="Số GCN unique đã trả ≥1 kỳ trong tháng / Số đơn có hiệu lực cuối tháng. "
+                    "Lưu ý: hieu_luc Cyber Risk bị đóng băng trong API từ đầu 2026.",
+        ), unsafe_allow_html=True)
+
     st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
 
     # ── Row 2: Per-product breakdown ──────────────────────────────────────────
     with st.expander("Chi tiết theo sản phẩm", expanded=True):
         rows = []
-        cutoff_month = (
-            pd.Timestamp.now() - pd.DateOffset(months=1)
-        ).to_period("M").to_timestamp()
+        cohort_min = (pd.Timestamp.now() - pd.DateOffset(months=8)).to_period("M").to_timestamp()
+        cohort_max = (pd.Timestamp.now() - pd.DateOffset(months=2)).to_period("M").to_timestamp()
+        cutoff_month = (pd.Timestamp.now() - pd.DateOffset(months=1)).to_period("M").to_timestamp()
+        mature_month = (
+            (pd.Timestamp.now().normalize() - pd.Timedelta(days=60))
+            .to_period("M").to_timestamp()
+        )
 
         for sp in sorted(products):
-            sp_ky = df_ky[df_ky["san_pham"] == sp]
+            # Q1: chỉ dùng cohort 2–8 tháng trước
+            sp_ky = df_ky[
+                (df_ky["san_pham"] == sp)
+                & df_ky["cohort_month"].between(cohort_min, cohort_max)
+            ]
             d = sp_ky.loc[sp_ky["trang_thai"] == "da_thu",           "so_gcn"].sum()
             q = sp_ky.loc[sp_ky["trang_thai"] == "chua_thu_qua_han", "so_gcn"].sum()
             tl = d / (d + q) * 100 if (d + q) > 0 else 0
@@ -231,14 +298,27 @@ def _render_scorecard(
                 dp_ky_val = int(avg_by_ky.idxmin())
                 dp_ret = avg_by_ky.min()
 
+            # Q2: sức khỏe danh mục tháng mature gần nhất
+            sp_h = df_health[
+                (df_health["san_pham"] == sp)
+                & (df_health["thang"] == mature_month)
+            ]
+            if not sp_h.empty and sp_h["hieu_luc"].notna().any():
+                gcn_paying = int(sp_h["distinct_gcn"].iloc[0])
+                hl = int(sp_h["hieu_luc"].iloc[0])
+                ty_le_active_sp = f"{gcn_paying / hl * 100:.1f}%" if hl > 0 else "—"
+            else:
+                ty_le_active_sp = "—"
+
             rows.append({
-                "Sản phẩm":        sp,
-                "Tỉ lệ thu (%)":   f"{tl:.1f}",
-                "GCN đã thu":      f"{int(d):,}",
-                "GCN quá hạn":     f"{int(q):,}",
-                "Retention K2→3 (%)": f"{ret2:.1f}" if pd.notna(ret2) else "—",
-                "Retention avg (%)":  f"{ret_all:.1f}" if pd.notna(ret_all) else "—",
-                "Kỳ drop-off":     f"Kỳ {dp_ky_val}→{dp_ky_val+1} ({dp_ret:.1f}%)" if dp_ky_val else "—",
+                "Sản phẩm":            sp,
+                "Hiệu quả thu (%)":    f"{tl:.1f}",
+                "GCN đã thu":          f"{int(d):,}",
+                "GCN quá hạn":         f"{int(q):,}",
+                "Sức khỏe danh mục":   ty_le_active_sp,
+                "Retention K2→3 (%)":  f"{ret2:.1f}" if pd.notna(ret2) else "—",
+                "Retention avg (%)":   f"{ret_all:.1f}" if pd.notna(ret_all) else "—",
+                "Kỳ drop-off":         f"Kỳ {dp_ky_val}→{dp_ky_val+1} ({dp_ret:.1f}%)" if dp_ky_val else "—",
             })
 
         if rows:
@@ -773,6 +853,7 @@ def render_payment_retention_page():
     # ── Load data ─────────────────────────────────────────────────────────────
     try:
         df_ky, df_month, df_date = load_all_payment_tracking()
+        df_health = load_portfolio_health()
     except Exception as e:
         st.error(f"Không thể tải dữ liệu: {e}")
         st.info(
@@ -832,7 +913,7 @@ def render_payment_retention_page():
     st.divider()
 
     # ── Scorecard ─────────────────────────────────────────────────────────────
-    _render_scorecard(df_ky, df_month, df_date, selected_products)
+    _render_scorecard(df_ky, df_month, df_date, df_health, selected_products)
 
     st.divider()
 
