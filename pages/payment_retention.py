@@ -286,7 +286,9 @@ def _render_cohort_heatmap(df_ky: pd.DataFrame, products: list[str]):
         wide["chua_thu_qua_han"] = 0
 
     wide["tong"] = wide["da_thu"] + wide["chua_thu_qua_han"]
-    wide["ty_le"] = (wide["da_thu"] / wide["tong"].where(wide["tong"] > 0)).round(4)
+    da_thu = wide["da_thu"].astype("float64")
+    tong   = wide["tong"].astype("float64")
+    wide["ty_le"] = (da_thu / tong.where(tong > 0)).round(4)
     wide["cohort_str"] = wide["cohort_month"].dt.strftime("%Y-%m")
     wide["ty_le_pct_str"] = wide["ty_le"].apply(lambda x: f"{x*100:.1f}%" if pd.notna(x) else "—")
 
