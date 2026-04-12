@@ -213,7 +213,7 @@ if not st.session_state.authenticated:
             </div>
         """, unsafe_allow_html=True)
 
-        pwd = st.text_input("", placeholder="Nhập mật khẩu", type="password",
+        pwd = st.text_input("Mật khẩu", placeholder="Nhập mật khẩu", type="password",
                             label_visibility="collapsed")
         submitted = st.form_submit_button("Đăng nhập")
         if submitted:
