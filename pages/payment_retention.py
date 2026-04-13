@@ -120,11 +120,8 @@ def _scorecard_metrics(
     ret_overall = fm_all["ty_le_giu_chan_pct"].mean() if not fm_all.empty else None
 
     # Q2 — Sức khỏe danh mục: distinct GCN đang đóng phí / GCN có hiệu lực
-    # Dùng tháng mature gần nhất (60 ngày trước để đảm bảo đủ data)
-    mature_month = (
-        (pd.Timestamp.now().normalize() - pd.Timedelta(days=60))
-        .to_period("M").to_timestamp()
-    )
+    # Dùng tháng mới nhất có trong data
+    mature_month = df_health["thang"].max()
     dh = df_health[
         df_health["san_pham"].isin(products)
         & (df_health["thang"] == mature_month)
@@ -540,13 +537,7 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
     st.altair_chart(trend, use_container_width=True)
 
     # ── Chart 2: So sánh tháng gần nhất ──────────────────────────────────────
-    mature_month = (
-        (pd.Timestamp.now().normalize() - pd.Timedelta(days=60))
-        .to_period("M").to_timestamp()
-    )
-    df_latest = df[df["thang"] == mature_month]
-    if df_latest.empty:
-        df_latest = df[df["thang"] == df["thang"].max()]
+    df_latest = df[df["thang"] == df["thang"].max()]
 
     if not df_latest.empty:
         latest_label = df_latest["thang_str"].iloc[0]
