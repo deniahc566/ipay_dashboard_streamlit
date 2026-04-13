@@ -612,88 +612,121 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
 
 # ── Retention Curve ───────────────────────────────────────────────────────────
 
-def _render_retention_curve(df_month: pd.DataFrame, products: list[str], min_gcn: int):
-    st.markdown("#### Duy trì đóng phí qua từng kỳ")
+def _render_retention_curve(df_ky: pd.DataFrame, df_month: pd.DataFrame, products: list[str], min_gcn: int):
+    st.markdown("#### Tỷ lệ HĐ còn lại qua từng kỳ")
     st.caption(
-        "Mỗi đường mờ = 1 tháng. Đường đậm = trung bình. "
-        "Ví dụ: điểm (kỳ=3, 85%) nghĩa là 85% hợp đồng đã trả kỳ 2 tiếp tục trả kỳ 3."
+        "Mỗi đường mờ = 1 cohort (tháng hiệu lực). Đường đậm = trung bình. "
+        "Bắt đầu từ 100% ở kỳ 1 — cho thấy sau mỗi kỳ còn bao nhiêu % HĐ so với ban đầu."
     )
 
-    df = df_month[df_month["san_pham"].isin(products)].copy()
+    import numpy as np
+
+    df = df_ky[df_ky["san_pham"].isin(products)].copy()
     if df.empty:
         st.info("Không có dữ liệu.")
         return
 
-    # Tháng M đủ mature khi ngày cuối tháng + 30 ngày đã qua
-    # (đảm bảo kỳ k+1 có đủ thời gian để được thu)
-    # Điều kiện: last_day(M) + 30 ngày <= hôm nay ≈ M_start + 60 ngày <= hôm nay
-    cutoff = pd.Timestamp.now().normalize() - pd.Timedelta(days=60)
-    df_old = df[df["thang_tra_ky_k"] <= cutoff].copy()
-    if df_old.empty:
-        st.info("Chưa đủ dữ liệu lịch sử (cần ít nhất 1 tháng có đủ thời gian thu).")
+    # Cohort size = tổng HĐ ở kỳ 1 (kỳ 1 luôn là da_thu)
+    cohort_n = (
+        df[df["ky"] == 1]
+        .groupby(["san_pham", "cohort_month"])["so_gcn"]
+        .sum()
+        .reset_index()
+        .rename(columns={"so_gcn": "cohort_n"})
+    )
+    if cohort_n.empty:
+        st.info("Không có dữ liệu kỳ 1.")
         return
 
-    df_old["thang_str"] = df_old["thang_tra_ky_k"].dt.strftime("%Y-%m")
+    # HĐ đã thu theo (san_pham, cohort_month, ky)
+    da_thu = (
+        df[df["trang_thai"] == "da_thu"]
+        .groupby(["san_pham", "cohort_month", "ky"])["so_gcn"]
+        .sum()
+        .reset_index()
+    )
 
-    n_products = len(df_old["san_pham"].unique())
+    surv = da_thu.merge(cohort_n, on=["san_pham", "cohort_month"])
+    surv["survival_pct"] = (surv["so_gcn"] / surv["cohort_n"] * 100).round(1)
+
+    # Thêm điểm neo kỳ 1 = 100%
+    anchor = cohort_n.copy()
+    anchor["ky"] = 1
+    anchor["so_gcn"] = anchor["cohort_n"]
+    anchor["survival_pct"] = 100.0
+
+    surv = pd.concat([
+        anchor[["san_pham", "cohort_month", "ky", "so_gcn", "survival_pct"]],
+        surv[surv["ky"] > 1][["san_pham", "cohort_month", "ky", "so_gcn", "survival_pct"]],
+    ]).sort_values(["san_pham", "cohort_month", "ky"]).reset_index(drop=True)
+
+    # Chỉ dùng cohort đủ cũ (≥ 3 tháng) để tránh recency bias
+    cohort_max = (pd.Timestamp.now() - pd.DateOffset(months=3)).to_period("M").to_timestamp()
+    surv = surv[surv["cohort_month"] <= cohort_max].copy()
+    if surv.empty:
+        st.info("Chưa đủ dữ liệu lịch sử.")
+        return
+
+    surv["cohort_str"] = surv["cohort_month"].dt.strftime("%Y-%m")
+
+    # Đường trung bình theo kỳ (tổng hợp tất cả cohort)
+    avg_df = surv.groupby("ky")["survival_pct"].mean().round(1).reset_index()
+
+    n_products = len(surv["san_pham"].unique())
     cols = st.columns(min(n_products, 2))
 
-    for i, sp in enumerate(sorted(df_old["san_pham"].unique())):
-        sp_df = df_old[df_old["san_pham"] == sp].copy()
-        color = _PRODUCT_COLORS.get(sp, "steelblue")
+    for i, sp in enumerate(sorted(surv["san_pham"].unique())):
+        sp_df  = surv[surv["san_pham"] == sp].copy()
+        sp_avg = sp_df.groupby("ky")["survival_pct"].mean().round(1).reset_index()
+        color  = _PRODUCT_COLORS.get(sp, "steelblue")
 
-        # Đường từng cohort (mờ)
         faint_lines = (
             alt.Chart(sp_df)
-            .mark_line(opacity=0.25, strokeWidth=1.2, color=color)
+            .mark_line(opacity=0.2, strokeWidth=1.2, color=color)
             .encode(
-                x=alt.X("ky:O", title="Kỳ thu", axis=alt.Axis(labelAngle=0)),
+                x=alt.X("ky:O", title="Kỳ thu phí", axis=alt.Axis(labelAngle=0)),
                 y=alt.Y(
-                    "ty_le_giu_chan_pct:Q",
-                    title="Duy trì đóng phí (%)",
-                    scale=alt.Scale(zero=False),
+                    "survival_pct:Q",
+                    title="% HĐ còn lại",
+                    scale=alt.Scale(domain=[0, 105]),
                 ),
-                detail="thang_str:N",
+                detail="cohort_str:N",
                 tooltip=[
-                    alt.Tooltip("thang_str:N", title="Tháng"),
+                    alt.Tooltip("cohort_str:N", title="Cohort tháng HĐ"),
                     alt.Tooltip("ky:O", title="Kỳ"),
-                    alt.Tooltip("ty_le_giu_chan_pct:Q", title="Duy trì đóng phí (%)", format=".1f"),
+                    alt.Tooltip("survival_pct:Q", title="% HĐ còn lại", format=".1f"),
                     alt.Tooltip("so_gcn:Q", title="Số HĐ", format=","),
                 ],
             )
         )
 
-        # Đường trung bình (đậm)
         avg_line = (
-            alt.Chart(sp_df)
+            alt.Chart(sp_avg)
             .mark_line(strokeWidth=3, color=color)
             .encode(
                 x=alt.X("ky:O"),
-                y=alt.Y("mean(ty_le_giu_chan_pct):Q"),
+                y=alt.Y("survival_pct:Q", scale=alt.Scale(domain=[0, 105])),
                 tooltip=[
                     alt.Tooltip("ky:O", title="Kỳ"),
-                    alt.Tooltip(
-                        "mean(ty_le_giu_chan_pct):Q",
-                        title="Duy trì đóng phí TB (%)",
-                        format=".1f",
-                    ),
+                    alt.Tooltip("survival_pct:Q", title="% HĐ còn lại TB", format=".1f"),
                 ],
             )
         )
 
-        # Điểm trên đường avg
         avg_points = (
-            alt.Chart(sp_df)
+            alt.Chart(sp_avg)
             .mark_point(filled=True, size=60, color=color)
             .encode(
                 x="ky:O",
-                y="mean(ty_le_giu_chan_pct):Q",
+                y="survival_pct:Q",
+                tooltip=[
+                    alt.Tooltip("ky:O", title="Kỳ"),
+                    alt.Tooltip("survival_pct:Q", title="% HĐ còn lại TB", format=".1f"),
+                ],
             )
         )
 
-        chart = (faint_lines + avg_line + avg_points).properties(
-            title=sp, height=280
-        )
+        chart = (faint_lines + avg_line + avg_points).properties(title=sp, height=280)
         with cols[i % 2]:
             st.altair_chart(chart, use_container_width=True)
 
@@ -1042,7 +1075,7 @@ def render_payment_retention_page():
         _render_q2_tab(df_health, selected_products)
 
     with tab3:
-        _render_retention_curve(df_month, selected_products, min_gcn)
+        _render_retention_curve(df_ky, df_month, selected_products, min_gcn)
 
     with tab4:
         _render_payment_date_table(df_date, selected_products)
