@@ -188,7 +188,7 @@ def _render_scorecard(
 
     with c1:
         st.markdown(kpi_card(
-            label="HIỆU QUẢ THU PHÍ",
+            label="TỶ LỆ THU PHÍ THEO THÁNG HIỆU LỰC",
             value=f"{m['ty_le']:.1f}%",
             delta_str=ty_le_delta_str or "—",
             delta_color=ty_le_delta_color,
@@ -229,7 +229,7 @@ def _render_scorecard(
             active_color      = "#888"
             d_color           = "#888"
         st.markdown(kpi_card(
-            label="SỨC KHỎE DANH MỤC",
+            label="TỶ LỆ THU PHÍ THEO THÁNG THU PHÍ",
             value=active_val,
             delta_str=active_delta_str,
             delta_color=d_color,
@@ -349,10 +349,10 @@ def _render_scorecard(
 
             rows.append({
                 "Sản phẩm":            sp,
-                "Hiệu quả thu (%)":    f"{tl:.1f}",
+                "Thu phí theo T.hiệu lực (%)": f"{tl:.1f}",
                 "HĐ đã thu":           f"{int(d):,}",
                 "HĐ quá hạn":          f"{int(q):,}",
-                "Sức khỏe danh mục":   ty_le_active_sp,
+                "Thu phí theo T.thu phí (%)": ty_le_active_sp,
                 "Kỳ thu phí tốt nhất": f"Kỳ {best_ky_sp}→{best_ky_sp+1} ({best_ky_ret_sp:.1f}%)" if best_ky_sp else "—",
                 "Kỳ dễ nghỉ nhất":     f"Kỳ {dp_ky_val}→{dp_ky_val+1} ({dp_ret:.1f}%)" if dp_ky_val else "—",
                 "Duy trì đóng phí TB (%)": f"{ret_all:.1f}" if pd.notna(ret_all) else "—",
@@ -696,8 +696,8 @@ def _render_cohort_heatmap(df_ky: pd.DataFrame, products: list[str]):
 
 def _render_retention_curve(df_month: pd.DataFrame, products: list[str], min_gcn: int):
     st.info(
-        "**Lưu ý:** Tab này trả lời câu hỏi **khác** với tab 'Hiệu quả thu trong kỳ'.\n\n"
-        "- **Hiệu quả thu:** Trong số HĐ ĐẾN HẠN kỳ này → bao nhiêu % đã thu được?\n"
+        "**Lưu ý:** Tab này trả lời câu hỏi **khác** với tab 'Thu phí theo tháng hiệu lực'.\n\n"
+        "- **Thu phí theo tháng hiệu lực:** Trong số HĐ ĐẾN HẠN kỳ này → bao nhiêu % đã thu được?\n"
         "- **Tab này:** Trong số HĐ đã trả kỳ k tháng M → bao nhiêu % tiếp tục trả kỳ k+1?"
     )
     st.markdown("#### Duy trì đóng phí qua từng kỳ")
@@ -1116,8 +1116,8 @@ def render_payment_retention_page():
 
     # ── Tabs ─────────────────────────────────────────────────────────────────
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Hiệu quả thu trong kỳ",
-        "Sức khỏe danh mục",
+        "Thu phí theo tháng hiệu lực",
+        "Thu phí theo tháng thu phí",
         "Bản đồ thu phí",
         "Duy trì đóng phí theo kỳ",
         "Trạng thái thu phí theo ngày",
