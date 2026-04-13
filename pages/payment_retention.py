@@ -3,13 +3,11 @@ payment_retention.py
 ---------------------
 Trang phân tích tỉ lệ thu phí và duy trì đóng phí theo kỳ.
 
-6 tab:
-  1. Hiệu quả thu trong kỳ    — Q1: trong số HĐ đến hạn, bao nhiêu % đã thu?
-  2. Sức khỏe danh mục        — Q2: trong số HĐ hiệu lực, bao nhiêu % đang đóng phí?
-  3. Bản đồ thu phí           — tháng hiệu lực × kỳ, màu = tỉ lệ thu thành công
-  4. Duy trì đóng phí theo kỳ — tỉ lệ tiếp tục đóng phí qua từng kỳ
-  5. Phân bố ngày trong tháng — ngày nào thu nhiều / duy trì tốt
-  6. Trạng thái thu phí theo ngày — bảng chi tiết payment_tracking_by_payment_date, lọc theo Tháng & Năm
+4 tab:
+  1. Thu phí theo tháng hiệu lực — Q1: trong số HĐ đến hạn, bao nhiêu % đã thu? (heatmap tháng × kỳ)
+  2. Thu phí theo tháng thu phí  — Q2: trong số HĐ hiệu lực, bao nhiêu % đang đóng phí?
+  3. Duy trì đóng phí theo kỳ   — tỉ lệ tiếp tục đóng phí qua từng kỳ
+  4. Trạng thái thu phí theo ngày — bảng chi tiết payment_tracking_by_payment_date, lọc theo Tháng & Năm
 """
 
 import streamlit as st
@@ -380,73 +378,81 @@ def _render_q1_tab(df_ky: pd.DataFrame, products: list[str]) -> None:
         st.info("Không có dữ liệu.")
         return
 
-    # ── Chart 1: Xu hướng theo tháng hiệu lực ────────────────────────────────
-    st.markdown("##### Xu hướng tỉ lệ thu theo tháng hiệu lực")
+    # ── Heatmap: Tỉ lệ thu thành công theo tháng hiệu lực ───────────────────
+    st.markdown("##### Tỉ lệ thu thành công theo tháng hiệu lực")
     st.caption(
-        "Tỉ lệ thu tổng hợp (kỳ 2+) theo tháng HĐ hiệu lực. "
-        "3 tháng gần nhất bị ẩn: kỳ 2 đến hạn sau 60 ngày, cần thêm ~30 ngày để collection hoàn tất."
+        "Mỗi ô = tỉ lệ hợp đồng đã thu / (đã thu + quá hạn chưa thu) cho tháng hiệu lực đó ở kỳ đó. "
+        "Vùng trống góc phải = kỳ chưa đến hạn với các hợp đồng mới."
     )
 
-    grp = (
-        df.groupby(["san_pham", "cohort_month", "trang_thai"])["so_gcn"]
+    grp_hm = (
+        df.groupby(["san_pham", "cohort_month", "ky", "trang_thai"])["so_gcn"]
         .sum()
         .reset_index()
     )
-    wide = grp.pivot_table(
-        index=["san_pham", "cohort_month"],
+    wide_hm = grp_hm.pivot_table(
+        index=["san_pham", "cohort_month", "ky"],
         columns="trang_thai",
         values="so_gcn",
         aggfunc="sum",
     ).fillna(0).reset_index()
-    wide.columns.name = None
-    if "da_thu" not in wide.columns:
-        wide["da_thu"] = 0
-    if "chua_thu_qua_han" not in wide.columns:
-        wide["chua_thu_qua_han"] = 0
-    da = np.array(wide["da_thu"], dtype=float)
-    to = da + np.array(wide["chua_thu_qua_han"], dtype=float)
-    wide["ty_le_pct"]   = np.where(to > 0, np.round(da / to * 100, 1), np.nan)
-    wide["cohort_str"]  = wide["cohort_month"].dt.strftime("%m/%Y")
-    wide["da_thu_fmt"]  = wide["da_thu"].apply(lambda x: f"{int(x):,}")
-    wide["qua_han_fmt"] = wide["chua_thu_qua_han"].apply(lambda x: f"{int(x):,}")
+    wide_hm.columns.name = None
+    if "da_thu" not in wide_hm.columns:
+        wide_hm["da_thu"] = 0
+    if "chua_thu_qua_han" not in wide_hm.columns:
+        wide_hm["chua_thu_qua_han"] = 0
 
-    # Exclude cohorts < 3 months old — kỳ 2 đến hạn tại cohort+60 ngày,
-    # cần thêm ~30 ngày buffer thu → cohort phải cũ hơn 90 ngày (3 tháng)
-    # để tránh recency bias (cohort quá mới chưa kịp thu kỳ 2 bị ghi là chua_thu_qua_han)
-    cutoff_new = (pd.Timestamp.now() - pd.DateOffset(months=3)).to_period("M").to_timestamp()
-    wide_trend = wide[wide["cohort_month"] <= cutoff_new].copy()
-
-    trend_chart = (
-        alt.Chart(wide_trend)
-        .mark_line(point=True, strokeWidth=2)
-        .encode(
-            x=alt.X("cohort_month:T", title="Tháng HĐ hiệu lực",
-                    timeUnit="yearmonth",
-                    axis=alt.Axis(format="%m/%Y", labelAngle=-45)),
-            y=alt.Y(
-                "ty_le_pct:Q",
-                title="Tỉ lệ thu (%)",
-                scale=alt.Scale(zero=False),
-            ),
-            color=alt.Color(
-                "san_pham:N",
-                title="Sản phẩm",
-                scale=alt.Scale(
-                    domain=list(_PRODUCT_COLORS.keys()),
-                    range=list(_PRODUCT_COLORS.values()),
-                ),
-            ),
-            tooltip=[
-                alt.Tooltip("san_pham:N", title="Sản phẩm"),
-                alt.Tooltip("cohort_str:N", title="Tháng HĐ hiệu lực"),
-                alt.Tooltip("ty_le_pct:Q", title="Tỉ lệ thu (%)", format=".1f"),
-                alt.Tooltip("da_thu_fmt:N", title="Đã thu"),
-                alt.Tooltip("qua_han_fmt:N", title="Quá hạn chưa thu"),
-            ],
-        )
-        .properties(height=300)
+    da_hm   = np.array(wide_hm["da_thu"].fillna(0), dtype=float)
+    chua_hm = np.array(wide_hm["chua_thu_qua_han"].fillna(0), dtype=float)
+    tong_hm = da_hm + chua_hm
+    wide_hm["ty_le"] = np.where(
+        tong_hm > 0,
+        np.round(da_hm / np.where(tong_hm > 0, tong_hm, 1.0), 4),
+        np.nan,
     )
-    st.altair_chart(trend_chart, use_container_width=True)
+    wide_hm["cohort_str"]    = wide_hm["cohort_month"].dt.strftime("%Y-%m")
+    wide_hm["ty_le_pct_str"] = wide_hm["ty_le"].apply(
+        lambda x: f"{x*100:.1f}%" if pd.notna(x) else "—"
+    )
+
+    n_hm = len(wide_hm["san_pham"].unique())
+    cols_hm = st.columns(min(n_hm, 2))
+    for i, sp in enumerate(sorted(wide_hm["san_pham"].unique())):
+        sp_df = wide_hm[wide_hm["san_pham"] == sp].copy()
+        with cols_hm[i % 2]:
+            st.markdown(f"**{sp}**")
+            hm_chart = (
+                alt.Chart(sp_df)
+                .mark_rect(stroke="white", strokeWidth=0.5)
+                .encode(
+                    x=alt.X(
+                        "cohort_str:O",
+                        title="Tháng hiệu lực",
+                        sort="ascending",
+                        axis=alt.Axis(labelAngle=-45),
+                    ),
+                    y=alt.Y(
+                        "ky:O",
+                        title="Kỳ thu phí",
+                        sort="descending",
+                    ),
+                    color=alt.Color(
+                        "ty_le:Q",
+                        scale=_retention_color_scale(),
+                        title="Tỉ lệ thu",
+                        legend=alt.Legend(format=".0%"),
+                    ),
+                    tooltip=[
+                        alt.Tooltip("cohort_str:N", title="Tháng HĐ hiệu lực"),
+                        alt.Tooltip("ky:O", title="Kỳ"),
+                        alt.Tooltip("ty_le_pct_str:N", title="Tỉ lệ thu"),
+                        alt.Tooltip("da_thu:Q", title="Đã thu", format=","),
+                        alt.Tooltip("chua_thu_qua_han:Q", title="Quá hạn chưa thu", format=","),
+                    ],
+                )
+                .properties(height=max(200, len(sp_df["ky"].unique()) * 30 + 60))
+            )
+            st.altair_chart(hm_chart, use_container_width=True)
 
     # ── Chart 2: Tỉ lệ thu theo từng kỳ ─────────────────────────────────────
     st.markdown("##### Tỉ lệ thu theo từng kỳ")
@@ -531,7 +537,7 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
     df["hl_fmt"]    = df["hieu_luc"].apply(lambda x: f"{int(x):,}")
 
     # ── Chart 1: Xu hướng theo tháng ─────────────────────────────────────────
-    st.markdown("##### Xu hướng sức khỏe danh mục theo tháng thu phí")
+    st.markdown("##### Tỷ lệ thu phí theo tháng thu phí")
     st.caption("% HĐ đang đóng phí / HĐ có hiệu lực theo từng tháng và sản phẩm.")
 
     trend = (
@@ -610,96 +616,9 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
         st.altair_chart((bar + text), use_container_width=True)
 
 
-# ── Chart 1: Cohort Heatmap ───────────────────────────────────────────────────
-
-def _render_cohort_heatmap(df_ky: pd.DataFrame, products: list[str]):
-    st.markdown("#### Tỉ lệ thu thành công theo tháng hiệu lực")
-    st.caption(
-        "Mỗi ô = tỉ lệ hợp đồng **đã thu** / (đã thu + quá hạn chưa thu) cho tháng đó ở kỳ đó. "
-        "Vùng trống góc trên-phải = kỳ chưa đến hạn với các hợp đồng mới."
-    )
-
-    df = df_ky[df_ky["san_pham"].isin(products)].copy()
-    if df.empty:
-        st.info("Không có dữ liệu cho sản phẩm đã chọn.")
-        return
-
-    # Tính tỉ lệ thu mỗi (san_pham, cohort_month, ky)
-    grp = (
-        df.groupby(["san_pham", "cohort_month", "ky", "trang_thai"])["so_gcn"]
-        .sum()
-        .reset_index()
-    )
-    wide = grp.pivot_table(
-        index=["san_pham", "cohort_month", "ky"],
-        columns="trang_thai",
-        values="so_gcn",
-        aggfunc="sum",
-    ).fillna(0).reset_index()
-    wide.columns.name = None
-
-    if "da_thu" not in wide.columns:
-        wide["da_thu"] = 0
-    if "chua_thu_qua_han" not in wide.columns:
-        wide["chua_thu_qua_han"] = 0
-
-    import numpy as np
-    da_thu = np.array(wide["da_thu"].fillna(0), dtype=float)
-    chua   = np.array(wide["chua_thu_qua_han"].fillna(0), dtype=float)
-    tong   = da_thu + chua
-    wide["tong"] = tong
-    wide["ty_le"] = np.where(tong > 0, np.round(da_thu / np.where(tong > 0, tong, 1.0), 4), np.nan)
-    wide["cohort_str"] = wide["cohort_month"].dt.strftime("%Y-%m")
-    wide["ty_le_pct_str"] = wide["ty_le"].apply(lambda x: f"{x*100:.1f}%" if pd.notna(x) else "—")
-
-    n_products = len(wide["san_pham"].unique())
-    cols = st.columns(min(n_products, 2))
-
-    for i, sp in enumerate(sorted(wide["san_pham"].unique())):
-        sp_df = wide[wide["san_pham"] == sp].copy()
-        with cols[i % 2]:
-            st.markdown(f"**{sp}**")
-            chart = (
-                alt.Chart(sp_df)
-                .mark_rect(stroke="white", strokeWidth=0.5)
-                .encode(
-                    x=alt.X(
-                        "ky:O",
-                        title="Kỳ thu",
-                        axis=alt.Axis(labelAngle=0),
-                    ),
-                    y=alt.Y(
-                        "cohort_str:O",
-                        title="Tháng hiệu lực",
-                        sort="descending",
-                    ),
-                    color=alt.Color(
-                        "ty_le:Q",
-                        scale=_retention_color_scale(),
-                        title="Tỉ lệ thu",
-                        legend=alt.Legend(format=".0%"),
-                    ),
-                    tooltip=[
-                        alt.Tooltip("cohort_str:N", title="Tháng HĐ hiệu lực"),
-                        alt.Tooltip("ky:O", title="Kỳ"),
-                        alt.Tooltip("ty_le_pct_str:N", title="Tỉ lệ thu"),
-                        alt.Tooltip("da_thu:Q", title="Đã thu", format=","),
-                        alt.Tooltip("chua_thu_qua_han:Q", title="Quá hạn chưa thu", format=","),
-                    ],
-                )
-                .properties(height=max(200, len(sp_df["cohort_str"].unique()) * 24 + 60))
-            )
-            st.altair_chart(chart, use_container_width=True)
-
-
-# ── Chart 2: Retention Curve ─────────────────────────────────────────────────
+# ── Retention Curve ───────────────────────────────────────────────────────────
 
 def _render_retention_curve(df_month: pd.DataFrame, products: list[str], min_gcn: int):
-    st.info(
-        "**Lưu ý:** Tab này trả lời câu hỏi **khác** với tab 'Thu phí theo tháng hiệu lực'.\n\n"
-        "- **Thu phí theo tháng hiệu lực:** Trong số HĐ ĐẾN HẠN kỳ này → bao nhiêu % đã thu được?\n"
-        "- **Tab này:** Trong số HĐ đã trả kỳ k tháng M → bao nhiêu % tiếp tục trả kỳ k+1?"
-    )
     st.markdown("#### Duy trì đóng phí qua từng kỳ")
     st.caption(
         "Mỗi đường mờ = 1 tháng. Đường đậm = trung bình. "
@@ -1115,10 +1034,9 @@ def render_payment_retention_page():
     st.divider()
 
     # ── Tabs ─────────────────────────────────────────────────────────────────
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4 = st.tabs([
         "Thu phí theo tháng hiệu lực",
         "Thu phí theo tháng thu phí",
-        "Bản đồ thu phí",
         "Duy trì đóng phí theo kỳ",
         "Trạng thái thu phí theo ngày",
     ])
@@ -1130,10 +1048,7 @@ def render_payment_retention_page():
         _render_q2_tab(df_health, selected_products)
 
     with tab3:
-        _render_cohort_heatmap(df_ky, selected_products)
-
-    with tab4:
         _render_retention_curve(df_month, selected_products, min_gcn)
 
-    with tab5:
+    with tab4:
         _render_payment_date_table(df_date, selected_products)
