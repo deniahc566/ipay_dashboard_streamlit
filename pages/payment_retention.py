@@ -615,93 +615,72 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
 def _render_retention_curve(df_ky: pd.DataFrame, df_month: pd.DataFrame, products: list[str], min_gcn: int):
     st.markdown("#### Tỷ lệ HĐ còn lại qua từng kỳ")
     st.caption(
-        "Mỗi đường mờ = 1 cohort (tháng hiệu lực). Đường đậm = trung bình. "
-        "Bắt đầu từ 100% ở kỳ 1 — cho thấy sau mỗi kỳ còn bao nhiêu % HĐ so với ban đầu."
+        "Kỳ 2 = 100% (tất cả HĐ bắt đầu đóng phí). "
+        "Mỗi đường mờ = tỷ lệ còn lại theo rates của 1 tháng. Đường đậm = trung bình."
     )
 
-    import numpy as np
-
-    df = df_ky[df_ky["san_pham"].isin(products)].copy()
+    df = df_month[df_month["san_pham"].isin(products)].copy()
     if df.empty:
         st.info("Không có dữ liệu.")
         return
 
-    # Cohort size = tổng HĐ ở kỳ 1 (kỳ 1 luôn là da_thu)
-    cohort_n = (
-        df[df["ky"] == 1]
-        .groupby(["san_pham", "cohort_month"])["so_gcn"]
-        .sum()
-        .reset_index()
-        .rename(columns={"so_gcn": "cohort_n"})
-    )
-    if cohort_n.empty:
-        st.info("Không có dữ liệu kỳ 1.")
-        return
-
-    # HĐ đã thu theo (san_pham, cohort_month, ky)
-    da_thu = (
-        df[df["trang_thai"] == "da_thu"]
-        .groupby(["san_pham", "cohort_month", "ky"])["so_gcn"]
-        .sum()
-        .reset_index()
-    )
-
-    surv = da_thu.merge(cohort_n, on=["san_pham", "cohort_month"])
-    surv["survival_pct"] = (surv["so_gcn"] / surv["cohort_n"] * 100).round(1)
-
-    # Thêm điểm neo kỳ 1 = 100%
-    anchor = cohort_n.copy()
-    anchor["ky"] = 1
-    anchor["so_gcn"] = anchor["cohort_n"]
-    anchor["survival_pct"] = 100.0
-
-    surv = pd.concat([
-        anchor[["san_pham", "cohort_month", "ky", "so_gcn", "survival_pct"]],
-        surv[surv["ky"] > 1][["san_pham", "cohort_month", "ky", "so_gcn", "survival_pct"]],
-    ]).sort_values(["san_pham", "cohort_month", "ky"]).reset_index(drop=True)
-
-    # Chỉ dùng cohort đủ cũ (≥ 3 tháng) để tránh recency bias
-    cohort_max = (pd.Timestamp.now() - pd.DateOffset(months=3)).to_period("M").to_timestamp()
-    surv = surv[surv["cohort_month"] <= cohort_max].copy()
-    if surv.empty:
+    # Chỉ dùng tháng mature (> 60 ngày) để tránh recency bias
+    cutoff = pd.Timestamp.now().normalize() - pd.Timedelta(days=60)
+    df = df[df["thang_tra_ky_k"] <= cutoff].copy()
+    if df.empty:
         st.info("Chưa đủ dữ liệu lịch sử.")
         return
 
-    surv["cohort_str"] = surv["cohort_month"].dt.strftime("%Y-%m")
+    df["thang_str"] = df["thang_tra_ky_k"].dt.strftime("%Y-%m")
 
-    # Đường trung bình theo kỳ (tổng hợp tất cả cohort)
-    avg_df = surv.groupby("ky")["survival_pct"].mean().round(1).reset_index()
-
-    n_products = len(surv["san_pham"].unique())
+    n_products = len(df["san_pham"].unique())
     cols = st.columns(min(n_products, 2))
 
-    for i, sp in enumerate(sorted(surv["san_pham"].unique())):
-        sp_df  = surv[surv["san_pham"] == sp].copy()
-        sp_avg = sp_df.groupby("ky")["survival_pct"].mean().round(1).reset_index()
-        color  = _PRODUCT_COLORS.get(sp, "steelblue")
+    for i, sp in enumerate(sorted(df["san_pham"].unique())):
+        sp_df = df[df["san_pham"] == sp].copy()
+        color = _PRODUCT_COLORS.get(sp, "steelblue")
+
+        # ── Đường trung bình: mean ty_le per ky → cumprod ─────────────────
+        avg_rates = (
+            sp_df.groupby("ky")["ty_le_giu_chan_pct"]
+            .mean()
+            .sort_index()
+        )
+        avg_surv_rows = [{"ky": 2, "survival_pct": 100.0}]
+        surv = 100.0
+        for ky, rate in avg_rates.items():
+            surv = surv * rate / 100
+            avg_surv_rows.append({"ky": int(ky) + 1, "survival_pct": round(surv, 1)})
+        avg_surv_df = pd.DataFrame(avg_surv_rows)
+
+        # ── Đường mờ: implied survival từ rates của từng tháng ────────────
+        faint_rows = []
+        for thang, grp in sp_df.groupby("thang_str"):
+            rates = grp.set_index("ky")["ty_le_giu_chan_pct"].sort_index()
+            faint_rows.append({"thang_str": thang, "ky": 2, "survival_pct": 100.0})
+            s = 100.0
+            for ky, rate in rates.items():
+                s = s * rate / 100
+                faint_rows.append({"thang_str": thang, "ky": int(ky) + 1, "survival_pct": round(s, 1)})
+        faint_df = pd.DataFrame(faint_rows)
 
         faint_lines = (
-            alt.Chart(sp_df)
+            alt.Chart(faint_df)
             .mark_line(opacity=0.2, strokeWidth=1.2, color=color)
             .encode(
                 x=alt.X("ky:O", title="Kỳ thu phí", axis=alt.Axis(labelAngle=0)),
-                y=alt.Y(
-                    "survival_pct:Q",
-                    title="% HĐ còn lại",
-                    scale=alt.Scale(domain=[0, 105]),
-                ),
-                detail="cohort_str:N",
+                y=alt.Y("survival_pct:Q", title="% HĐ còn lại", scale=alt.Scale(domain=[0, 105])),
+                detail="thang_str:N",
                 tooltip=[
-                    alt.Tooltip("cohort_str:N", title="Cohort tháng HĐ"),
+                    alt.Tooltip("thang_str:N", title="Tháng rates"),
                     alt.Tooltip("ky:O", title="Kỳ"),
                     alt.Tooltip("survival_pct:Q", title="% HĐ còn lại", format=".1f"),
-                    alt.Tooltip("so_gcn:Q", title="Số HĐ", format=","),
                 ],
             )
         )
 
         avg_line = (
-            alt.Chart(sp_avg)
+            alt.Chart(avg_surv_df)
             .mark_line(strokeWidth=3, color=color)
             .encode(
                 x=alt.X("ky:O"),
@@ -714,7 +693,7 @@ def _render_retention_curve(df_ky: pd.DataFrame, df_month: pd.DataFrame, product
         )
 
         avg_points = (
-            alt.Chart(sp_avg)
+            alt.Chart(avg_surv_df)
             .mark_point(filled=True, size=60, color=color)
             .encode(
                 x="ky:O",
