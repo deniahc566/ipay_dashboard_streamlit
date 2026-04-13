@@ -85,23 +85,7 @@ def _scorecard_metrics(
         if r_new is not None and r_prev is not None:
             ty_le_delta = r_new - r_prev
 
-    # Avg retention kỳ 2→3 (mature months only: < tháng hiện tại - 1)
     cutoff_month = (pd.Timestamp.now() - pd.DateOffset(months=1)).to_period("M").to_timestamp()
-    fm = df_month[
-        df_month["san_pham"].isin(products)
-        & (df_month["thang_tra_ky_k"] < cutoff_month)
-        & (df_month["ky"] == 2)
-    ]
-    ret_ky2 = fm["ty_le_giu_chan_pct"].mean() if not fm.empty else None
-
-    # MoM delta retention kỳ 2: tháng gần nhất mature vs tháng trước đó
-    ret_delta = None
-    months_ky2 = sorted(fm["thang_tra_ky_k"].unique()) if not fm.empty else []
-    if len(months_ky2) >= 2:
-        r_new  = fm[fm["thang_tra_ky_k"] == months_ky2[-1]]["ty_le_giu_chan_pct"].mean()
-        r_prev = fm[fm["thang_tra_ky_k"] == months_ky2[-2]]["ty_le_giu_chan_pct"].mean()
-        if pd.notna(r_new) and pd.notna(r_prev):
-            ret_delta = r_new - r_prev
 
     # Kỳ có retention thấp nhất (drop-off point)
     fm_all = df_month[
@@ -110,11 +94,23 @@ def _scorecard_metrics(
         & df_month["ky"].between(2, 11)
     ]
     dropoff_ky = None
+    best_ky = None
+    best_ky_ret = None
+    best_ky_delta = None
     if not fm_all.empty:
         avg_by_ky = fm_all.groupby("ky")["ty_le_giu_chan_pct"].mean()
         if not avg_by_ky.empty:
             dropoff_ky = int(avg_by_ky.idxmin())
             dropoff_val = avg_by_ky.min()
+            best_ky = int(avg_by_ky.idxmax())
+            best_ky_ret = float(avg_by_ky.max())
+            fm_best = fm_all[fm_all["ky"] == best_ky]
+            months_best = sorted(fm_best["thang_tra_ky_k"].unique())
+            if len(months_best) >= 2:
+                r_new = fm_best[fm_best["thang_tra_ky_k"] == months_best[-1]]["ty_le_giu_chan_pct"].mean()
+                r_prev = fm_best[fm_best["thang_tra_ky_k"] == months_best[-2]]["ty_le_giu_chan_pct"].mean()
+                if pd.notna(r_new) and pd.notna(r_prev):
+                    best_ky_delta = float(r_new - r_prev)
         else:
             dropoff_val = None
     else:
@@ -145,7 +141,7 @@ def _scorecard_metrics(
     return dict(
         da_thu=int(da_thu), qua_han=int(qua_han), tong=int(tong),
         ty_le=ty_le, ty_le_delta=ty_le_delta,
-        ret_ky2=ret_ky2, ret_delta=ret_delta,
+        best_ky=best_ky, best_ky_ret=best_ky_ret, best_ky_delta=best_ky_delta,
         ret_overall=ret_overall,
         dropoff_ky=dropoff_ky, dropoff_val=dropoff_val,
         active_gcn=active_gcn, active_hieu_luc=active_hieu_luc,
@@ -199,24 +195,26 @@ def _render_scorecard(
             subtitle=f"Tổng {m['tong']:,} hợp đồng đang theo dõi",
         ), unsafe_allow_html=True)
 
-    # Card 3: Duy trì đóng phí K2→3
-    ret_str = f"{m['ret_ky2']:.1f}%" if m["ret_ky2"] is not None else "—"
-    ret_delta_str = ""
-    ret_delta_color = "#888"
-    if m["ret_delta"] is not None:
-        sign = "▲" if m["ret_delta"] >= 0 else "▼"
-        ret_delta_color = "#2e7d32" if m["ret_delta"] >= 0 else "#c62828"
-        ret_delta_str = f"{sign} {abs(m['ret_delta']):.1f} điểm % so với tháng trước"
+    # Card 3: Kỳ thu phí tốt nhất
+    best_ret_str = f"{m['best_ky_ret']:.1f}%" if m["best_ky_ret"] is not None else "—"
+    best_ky_label = f"Kỳ {m['best_ky']}→{m['best_ky'] + 1}" if m["best_ky"] is not None else "—"
+    best_delta_str = ""
+    best_delta_color = "#888"
+    if m["best_ky_delta"] is not None:
+        sign = "▲" if m["best_ky_delta"] >= 0 else "▼"
+        best_delta_color = "#2e7d32" if m["best_ky_delta"] >= 0 else "#c62828"
+        best_delta_str = f"{sign} {abs(m['best_ky_delta']):.1f} điểm % so với tháng trước"
 
     with c3:
         st.markdown(kpi_card(
-            label="DUY TRÌ ĐÓNG PHÍ K2→3",
-            value=ret_str,
-            delta_str=ret_delta_str or "—",
-            delta_color=ret_delta_color,
+            label="KỲ THU PHÍ TỐT NHẤT",
+            value=best_ret_str,
+            delta_str=best_delta_str or "—",
+            delta_color=best_delta_color,
             accent_color="#1b5e20",
-            subtitle="Trung bình các tháng có đủ dữ liệu",
-            tooltip="Trong 100 hợp đồng đã trả kỳ 2, có bao nhiêu hợp đồng tiếp tục trả kỳ 3?",
+            subtitle=best_ky_label + " · Trung bình các tháng có đủ dữ liệu",
+            tooltip="Kỳ thu phí có tỉ lệ duy trì đóng phí cao nhất, tính trên kỳ 2–11 "
+                    "của các tháng đã có đủ dữ liệu (mature).",
         ), unsafe_allow_html=True)
 
     # Card 4: Kỳ duy trì thấp nhất
@@ -294,7 +292,9 @@ def _render_scorecard(
                 df_month["san_pham"].eq(sp)
                 & df_month["thang_tra_ky_k"].lt(cutoff_month)
             ]
-            ret2 = sp_m[sp_m["ky"] == 2]["ty_le_giu_chan_pct"].mean()
+            avg_by_ky_sp = sp_m[sp_m["ky"].between(2, 11)].groupby("ky")["ty_le_giu_chan_pct"].mean()
+            best_ky_sp = int(avg_by_ky_sp.idxmax()) if not avg_by_ky_sp.empty else None
+            best_ky_ret_sp = float(avg_by_ky_sp.max()) if not avg_by_ky_sp.empty else None
             ret_all = sp_m[sp_m["ky"].between(2, 11)]["ty_le_giu_chan_pct"].mean()
 
             dp_ky_val = None
@@ -322,7 +322,7 @@ def _render_scorecard(
                 "HĐ đã thu":           f"{int(d):,}",
                 "HĐ quá hạn":          f"{int(q):,}",
                 "Sức khỏe danh mục":   ty_le_active_sp,
-                "Duy trì đóng phí K2→3 (%)": f"{ret2:.1f}" if pd.notna(ret2) else "—",
+                "Kỳ thu phí tốt nhất": f"Kỳ {best_ky_sp}→{best_ky_sp+1} ({best_ky_ret_sp:.1f}%)" if best_ky_sp else "—",
                 "Duy trì đóng phí TB (%)":   f"{ret_all:.1f}" if pd.notna(ret_all) else "—",
                 "Kỳ dễ nghỉ nhất":     f"Kỳ {dp_ky_val}→{dp_ky_val+1} ({dp_ret:.1f}%)" if dp_ky_val else "—",
             })
