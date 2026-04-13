@@ -852,19 +852,15 @@ _MONTH_NAMES = {
 def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> None:
     st.markdown("#### Trạng thái thu phí theo ngày")
 
-    # ── Filters ──────────────────────────────────────────────────────────────
     df_filtered = df_date[df_date["san_pham"].isin(products)].copy()
 
+    # ── Filters: Năm → Tháng → Ngày ─────────────────────────────────────────
     available_years = sorted(df_filtered["ngay_tra_ky_k"].dt.year.unique(), reverse=True)
-    default_year = available_years[0] if available_years else pd.Timestamp.now().year
 
-    fc1, fc2 = st.columns([1, 1])
+    fc1, fc2, fc3 = st.columns([1, 1, 2])
     with fc1:
         selected_year = st.selectbox(
-            "Năm",
-            options=available_years,
-            index=0,
-            key="pdt_year",
+            "Năm", options=available_years, index=0, key="pdt_year",
         )
     with fc2:
         months_in_year = sorted(
@@ -874,20 +870,146 @@ def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> No
             reverse=True,
         )
         selected_month = st.selectbox(
-            "Tháng",
-            options=months_in_year,
-            index=0,
-            key="pdt_month",
+            "Tháng", options=months_in_year, index=0, key="pdt_month",
             format_func=lambda m: _MONTH_NAMES.get(m, f"Tháng {m}"),
         )
 
-    df_show = df_filtered[
+    # Data cho cả tháng — dùng cho charts
+    df_month_data = df_filtered[
         (df_filtered["ngay_tra_ky_k"].dt.year == selected_year)
         & (df_filtered["ngay_tra_ky_k"].dt.month == selected_month)
     ].copy()
 
-    if df_show.empty:
+    with fc3:
+        available_days = sorted(df_month_data["ngay_tra_ky_k"].dt.day.unique())
+        selected_days = st.multiselect(
+            "Ngày (chỉ lọc bảng)",
+            options=available_days,
+            default=available_days,
+            key="pdt_days",
+            format_func=lambda d: f"{d:02d}",
+        )
+
+    if df_month_data.empty:
         st.info("Không có dữ liệu cho tháng và năm đã chọn.")
+        return
+
+    # ── Kỳ selector cho biểu đồ ─────────────────────────────────────────────
+    available_ky = sorted(df_month_data["ky"].unique())
+    ck1, _ = st.columns([1, 3])
+    with ck1:
+        selected_ky = st.selectbox(
+            "Kỳ thu phí (biểu đồ)",
+            options=available_ky,
+            index=0,
+            key="pdt_chart_ky",
+            format_func=lambda k: f"Kỳ {k} → {k + 1}",
+        )
+
+    df_chart = df_month_data[df_month_data["ky"] == selected_ky].copy()
+    df_chart["ngay"] = df_chart["ngay_tra_ky_k"].dt.day
+
+    # ── Biểu đồ ─────────────────────────────────────────────────────────────
+    col_left, col_right = st.columns(2)
+
+    # Chart 1: Stacked bar — Số GCN đã/chưa thu kỳ tiếp
+    with col_left:
+        st.markdown(f"##### Số GCN theo ngày — Kỳ {selected_ky}→{selected_ky + 1}")
+        agg = (
+            df_chart.groupby("ngay")
+            .agg(da_thu=("da_tra_ky_tiep", "sum"), chua_thu=("chua_tra_ky_tiep", "sum"))
+            .reset_index()
+        )
+        melted = agg.melt(
+            id_vars=["ngay"],
+            value_vars=["da_thu", "chua_thu"],
+            var_name="trang_thai",
+            value_name="so_gcn",
+        )
+        melted["trang_thai"] = melted["trang_thai"].map(
+            {"da_thu": "Đã thu kỳ tiếp", "chua_thu": "Chưa thu kỳ tiếp"}
+        )
+        bar = (
+            alt.Chart(melted)
+            .mark_bar()
+            .encode(
+                x=alt.X("ngay:O", title="Ngày", axis=alt.Axis(labelAngle=0)),
+                y=alt.Y("so_gcn:Q", title="Số GCN", stack="zero"),
+                color=alt.Color(
+                    "trang_thai:N",
+                    title="Trạng thái",
+                    scale=alt.Scale(
+                        domain=["Đã thu kỳ tiếp", "Chưa thu kỳ tiếp"],
+                        range=["#2ca02c", "#d62728"],
+                    ),
+                    legend=alt.Legend(orient="bottom"),
+                ),
+                tooltip=[
+                    alt.Tooltip("ngay:O", title="Ngày"),
+                    alt.Tooltip("trang_thai:N", title="Trạng thái"),
+                    alt.Tooltip("so_gcn:Q", title="Số GCN", format=",d"),
+                ],
+            )
+            .properties(height=280)
+        )
+        st.altair_chart(bar, use_container_width=True)
+
+    # Chart 2: Line — Tỉ lệ duy trì thu phí (chỉ is_mature)
+    with col_right:
+        st.markdown(f"##### Tỉ lệ duy trì thu phí — Kỳ {selected_ky}→{selected_ky + 1}")
+        df_line = df_chart[df_chart["is_mature"]].copy()
+        if df_line.empty:
+            st.info("Chưa có ngày nào đã quá 30 ngày trong tháng này.")
+        else:
+            line_agg = (
+                df_line.groupby(["ngay", "san_pham"])
+                .agg(da_thu=("da_tra_ky_tiep", "sum"), so_gcn=("so_gcn", "sum"))
+                .reset_index()
+            )
+            line_agg["ty_le"] = (
+                line_agg["da_thu"]
+                / line_agg["so_gcn"].replace(0, float("nan"))
+                * 100
+            ).round(1)
+            line_chart = (
+                alt.Chart(line_agg)
+                .mark_line(point=True, strokeWidth=2)
+                .encode(
+                    x=alt.X("ngay:O", title="Ngày", axis=alt.Axis(labelAngle=0)),
+                    y=alt.Y(
+                        "ty_le:Q",
+                        title="Duy trì thu phí (%)",
+                        scale=alt.Scale(zero=False),
+                    ),
+                    color=alt.Color(
+                        "san_pham:N",
+                        title="Sản phẩm",
+                        scale=alt.Scale(
+                            domain=list(_PRODUCT_COLORS.keys()),
+                            range=list(_PRODUCT_COLORS.values()),
+                        ),
+                        legend=alt.Legend(orient="bottom"),
+                    ),
+                    tooltip=[
+                        alt.Tooltip("san_pham:N", title="Sản phẩm"),
+                        alt.Tooltip("ngay:O", title="Ngày"),
+                        alt.Tooltip("ty_le:Q", title="Duy trì thu phí (%)", format=".1f"),
+                        alt.Tooltip("so_gcn:Q", title="Số GCN", format=",d"),
+                    ],
+                )
+                .properties(height=280)
+            )
+            st.altair_chart(line_chart, use_container_width=True)
+
+    st.divider()
+
+    # ── Bảng — lọc thêm theo Ngày ────────────────────────────────────────────
+    df_show = df_month_data.copy()
+    if selected_days:
+        df_show = df_show[df_show["ngay_tra_ky_k"].dt.day.isin(selected_days)]
+
+    if df_show.empty:
+        st.info("Không có dữ liệu cho ngày đã chọn.")
         return
 
     df_show["ngay_tra_ky_k"] = df_show["ngay_tra_ky_k"].dt.strftime("%d/%m/%Y")
