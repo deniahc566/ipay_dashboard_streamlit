@@ -882,26 +882,28 @@ def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> No
 
     with fc3:
         available_ky = sorted(df_month_data["ky"].unique())
-        selected_ky = st.multiselect(
+        ky_min_avail = int(available_ky[0]) if available_ky else 2
+        ky_max_avail = int(available_ky[-1]) if available_ky else 11
+        ky_range = st.slider(
             "Kỳ thu phí",
-            options=available_ky,
-            default=available_ky,
+            min_value=ky_min_avail,
+            max_value=ky_max_avail,
+            value=(ky_min_avail, ky_max_avail),
             key="pdt_ky",
-            format_func=lambda k: f"Kỳ {k}",
+            format="Kỳ %d",
         )
 
     if df_month_data.empty:
         st.info("Không có dữ liệu cho tháng và năm đã chọn.")
         return
 
+    ky_lo, ky_hi = ky_range
     df_chart = df_month_data[
-        df_month_data["ky"].isin(selected_ky) if selected_ky else df_month_data["ky"].isin([])
+        df_month_data["ky"].between(ky_lo, ky_hi)
     ].copy()
     df_chart["ngay"] = df_chart["ngay_tra_ky_k"].dt.day
 
-    ky_label = (
-        f"Kỳ {min(selected_ky)}–{max(selected_ky)}" if selected_ky else "—"
-    )
+    ky_label = f"Kỳ {ky_lo}–{ky_hi}" if ky_lo != ky_hi else f"Kỳ {ky_lo}"
 
     # ── Biểu đồ ─────────────────────────────────────────────────────────────
     col_left, col_right = st.columns(2)
@@ -998,20 +1000,20 @@ def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> No
     st.divider()
 
     # ── Bảng — lọc theo Kỳ + Ngày ────────────────────────────────────────────
-    df_show = df_month_data[
-        df_month_data["ky"].isin(selected_ky) if selected_ky else df_month_data["ky"].isin([])
-    ].copy()
+    df_show = df_month_data[df_month_data["ky"].between(ky_lo, ky_hi)].copy()
 
     available_days = sorted(df_show["ngay_tra_ky_k"].dt.day.unique())
-    selected_days = st.multiselect(
+    day_min_avail = int(available_days[0]) if available_days else 1
+    day_max_avail = int(available_days[-1]) if available_days else 31
+    day_range = st.slider(
         "Ngày",
-        options=available_days,
-        default=available_days,
+        min_value=day_min_avail,
+        max_value=day_max_avail,
+        value=(day_min_avail, day_max_avail),
         key="pdt_days",
-        format_func=lambda d: f"{d:02d}",
     )
-    if selected_days:
-        df_show = df_show[df_show["ngay_tra_ky_k"].dt.day.isin(selected_days)]
+    day_lo, day_hi = day_range
+    df_show = df_show[df_show["ngay_tra_ky_k"].dt.day.between(day_lo, day_hi)]
 
     if df_show.empty:
         st.info("Không có dữ liệu cho lựa chọn đã chọn.")
