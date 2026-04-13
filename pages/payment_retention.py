@@ -3,14 +3,13 @@ payment_retention.py
 ---------------------
 Trang phân tích tỉ lệ thu phí và duy trì đóng phí theo kỳ.
 
-7 tab:
-  1. Hiệu quả thu trong kỳ — Q1: trong số HĐ đến hạn, bao nhiêu % đã thu?
-  2. Sức khỏe danh mục     — Q2: trong số HĐ hiệu lực, bao nhiêu % đang đóng phí?
-  3. Bản đồ thu phí        — tháng hiệu lực × kỳ, màu = tỉ lệ thu thành công
+6 tab:
+  1. Hiệu quả thu trong kỳ    — Q1: trong số HĐ đến hạn, bao nhiêu % đã thu?
+  2. Sức khỏe danh mục        — Q2: trong số HĐ hiệu lực, bao nhiêu % đang đóng phí?
+  3. Bản đồ thu phí           — tháng hiệu lực × kỳ, màu = tỉ lệ thu thành công
   4. Duy trì đóng phí theo kỳ — tỉ lệ tiếp tục đóng phí qua từng kỳ
-  5. Xu hướng theo ngày    — trung bình 7 ngày
-  6. Phân bố ngày trong tháng — ngày nào thu nhiều / duy trì tốt
-  7. Dữ liệu chi tiết      — bảng lọc chi tiết
+  5. Phân bố ngày trong tháng — ngày nào thu nhiều / duy trì tốt
+  6. Trạng thái thu phí theo ngày — bảng chi tiết payment_tracking_by_payment_date, lọc theo Tháng & Năm
 """
 
 import streamlit as st
@@ -757,81 +756,7 @@ def _render_retention_curve(df_month: pd.DataFrame, products: list[str], min_gcn
             st.altair_chart(chart, use_container_width=True)
 
 
-# ── Chart 3: Rolling 7-day Trend ─────────────────────────────────────────────
-
-def _render_rolling_trend(df_date: pd.DataFrame, products: list[str], min_gcn: int):
-    st.markdown("#### Xu hướng duy trì đóng phí theo ngày (trung bình 7 ngày)")
-    st.caption(
-        "Tỉ lệ tiếp tục đóng phí qua kỳ, trung bình trượt 7 ngày. Chỉ tính ngày có ≥ "
-        f"{min_gcn:,} hợp đồng để tránh nhiễu từ ngày ít giao dịch."
-    )
-
-    col_ky, _ = st.columns([1, 3])
-    with col_ky:
-        selected_ky = st.selectbox(
-            "Xem kỳ",
-            options=list(range(2, 12)),
-            index=0,
-            key="trend_ky",
-            format_func=lambda k: f"Kỳ {k} → Kỳ {k+1}",
-        )
-
-    df = df_date[
-        df_date["san_pham"].isin(products)
-        & (df_date["ky"] == selected_ky)
-        & (df_date["so_gcn"] >= min_gcn)
-    ].copy()
-
-    if df.empty:
-        st.info("Không có dữ liệu cho kỳ và bộ lọc đã chọn.")
-        return
-
-    # Rolling 7-ngày cho mỗi sản phẩm
-    records = []
-    for sp, grp in df.groupby("san_pham"):
-        g = grp.sort_values("ngay_tra_ky_k").copy()
-        g["rolling_7"] = g["ty_le_giu_chan_pct"].rolling(7, min_periods=3).mean().round(2)
-        records.append(g)
-    df_roll = pd.concat(records, ignore_index=True)
-
-    # Cắt bỏ 30 ngày gần nhất vì kỳ k+1 chưa có đủ thời gian xảy ra
-    cutoff = pd.Timestamp.now().normalize() - pd.DateOffset(days=30)
-    df_roll = df_roll[df_roll["ngay_tra_ky_k"] <= cutoff]
-    if df_roll.empty:
-        st.info("Chưa đủ dữ liệu lịch sử.")
-        return
-
-    base = alt.Chart(df_roll).encode(
-        x=alt.X("ngay_tra_ky_k:T", title="Ngày"),
-        color=alt.Color(
-            "san_pham:N",
-            title="Sản phẩm",
-            scale=alt.Scale(
-                domain=list(_PRODUCT_COLORS.keys()),
-                range=list(_PRODUCT_COLORS.values()),
-            ),
-        ),
-        tooltip=[
-            alt.Tooltip("san_pham:N", title="Sản phẩm"),
-            alt.Tooltip("ngay_tra_ky_k:T", title="Ngày", format="%d/%m/%Y"),
-            alt.Tooltip("rolling_7:Q", title="Duy trì đóng phí TB 7 ngày (%)", format=".1f"),
-            alt.Tooltip("ty_le_giu_chan_pct:Q", title="Duy trì đóng phí ngày (%)", format=".1f"),
-            alt.Tooltip("so_gcn:Q", title="Số HĐ", format=","),
-        ],
-    )
-
-    lines = base.mark_line(strokeWidth=2).encode(
-        y=alt.Y("rolling_7:Q", title="Duy trì đóng phí TB 7 ngày (%)", scale=alt.Scale(zero=False)),
-    )
-    band = base.mark_errorband(extent="ci").encode(
-        y=alt.Y("ty_le_giu_chan_pct:Q"),
-    )
-
-    chart = (band + lines).properties(height=320)
-    st.altair_chart(chart, use_container_width=True)
-
-
-# ── Chart 4: Day-of-Month Heatmap ────────────────────────────────────────────
+# ── Chart 3: Day-of-Month Heatmap ────────────────────────────────────────────
 
 def _render_dom_heatmap(df_date: pd.DataFrame, products: list[str], min_gcn: int):
     col_left, col_right = st.columns(2)
@@ -915,189 +840,126 @@ def _render_dom_heatmap(df_date: pd.DataFrame, products: list[str], min_gcn: int
         st.altair_chart(ret_chart, use_container_width=True)
 
 
-# ── Tab 5: Detail Tables ─────────────────────────────────────────────────────
+# ── Tab: Trạng thái thu phí theo ngày ───────────────────────────────────────
 
-def _render_detail_tables(
-    df_ky: pd.DataFrame,
-    df_month: pd.DataFrame,
-    df_date: pd.DataFrame,
-    products: list[str],
-) -> None:
+_MONTH_NAMES = {
+    1: "Tháng 1", 2: "Tháng 2", 3: "Tháng 3", 4: "Tháng 4",
+    5: "Tháng 5", 6: "Tháng 6", 7: "Tháng 7", 8: "Tháng 8",
+    9: "Tháng 9", 10: "Tháng 10", 11: "Tháng 11", 12: "Tháng 12",
+}
 
-    # ── Bảng 1: Tháng hiệu lực × Kỳ (df_ky) ────────────────────────────────
-    st.markdown("#### Tỉ lệ thu phí theo tháng hiệu lực × kỳ")
 
-    b1c1, b1c2, b1c3 = st.columns([2, 2, 2])
-    with b1c1:
-        ky_products = st.multiselect(
-            "Sản phẩm",
-            options=products,
-            default=products,
-            key="dt_ky_products",
+def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> None:
+    st.markdown("#### Trạng thái thu phí theo ngày")
+    st.caption(
+        "Bảng chi tiết từ bảng `silver.payment_tracking_by_payment_date`. "
+        "Mỗi dòng là một ngày × sản phẩm × kỳ thu. "
+        "Cột **Đủ thành thục** cho biết liệu đã đủ thời gian để kỳ tiếp theo có thể xảy ra "
+        "(ngày thu kỳ k + 30 ngày ≤ hôm nay). Chỉ những dòng đủ thành thục mới có tỉ lệ duy trì đáng tin cậy."
+    )
+
+    # ── Filters ──────────────────────────────────────────────────────────────
+    df_filtered = df_date[df_date["san_pham"].isin(products)].copy()
+
+    available_years = sorted(df_filtered["ngay_tra_ky_k"].dt.year.unique(), reverse=True)
+    default_year = available_years[0] if available_years else pd.Timestamp.now().year
+
+    fc1, fc2 = st.columns([1, 1])
+    with fc1:
+        selected_year = st.selectbox(
+            "Năm",
+            options=available_years,
+            index=0,
+            key="pdt_year",
         )
-    with b1c2:
-        all_cohorts = sorted(df_ky["cohort_month"].dt.strftime("%Y-%m").unique())
-        ky_cohorts = st.multiselect(
-            "Tháng bắt đầu hiệu lực",
-            options=all_cohorts,
-            default=all_cohorts[-6:] if len(all_cohorts) >= 6 else all_cohorts,
-            key="dt_ky_cohorts",
+    with fc2:
+        months_in_year = sorted(
+            df_filtered[df_filtered["ngay_tra_ky_k"].dt.year == selected_year][
+                "ngay_tra_ky_k"
+            ].dt.month.unique(),
+            reverse=True,
         )
-    with b1c3:
-        ky_ky = st.multiselect(
-            "Kỳ",
-            options=list(range(2, 13)),
-            default=list(range(2, 13)),
-            key="dt_ky_ky",
-            format_func=lambda k: f"Kỳ {k}",
+        selected_month = st.selectbox(
+            "Tháng",
+            options=months_in_year,
+            index=0,
+            key="pdt_month",
+            format_func=lambda m: _MONTH_NAMES.get(m, f"Tháng {m}"),
         )
 
-    df_ky_f = df_ky[
-        df_ky["san_pham"].isin(ky_products)
-        & df_ky["cohort_month"].dt.strftime("%Y-%m").isin(ky_cohorts)
-        & df_ky["ky"].isin(ky_ky)
+    df_show = df_filtered[
+        (df_filtered["ngay_tra_ky_k"].dt.year == selected_year)
+        & (df_filtered["ngay_tra_ky_k"].dt.month == selected_month)
     ].copy()
 
-    if df_ky_f.empty:
-        st.info("Không có dữ liệu.")
-    else:
-        wide = df_ky_f.pivot_table(
-            index=["san_pham", "cohort_month", "ky"],
-            columns="trang_thai",
-            values="so_gcn",
-            aggfunc="sum",
-        ).fillna(0).reset_index()
-        wide.columns.name = None
-        if "da_thu" not in wide.columns:
-            wide["da_thu"] = 0
-        if "chua_thu_qua_han" not in wide.columns:
-            wide["chua_thu_qua_han"] = 0
-        wide["tong"] = wide["da_thu"] + wide["chua_thu_qua_han"]
-        wide["ty_le_thu (%)"] = (
-            wide["da_thu"] / wide["tong"].replace(0, float("nan")) * 100
-        ).round(1)
-        wide["cohort_month"] = wide["cohort_month"].dt.strftime("%Y-%m")
-        wide = wide.rename(columns={
-            "san_pham": "Sản phẩm",
-            "cohort_month": "Tháng HĐ hiệu lực",
-            "ky": "Kỳ",
-            "da_thu": "Đã thu",
-            "chua_thu_qua_han": "Quá hạn chưa thu",
-            "tong": "Tổng",
-        }).sort_values(["Sản phẩm", "Tháng HĐ hiệu lực", "Kỳ"])
-        st.dataframe(wide, use_container_width=True, hide_index=True)
+    if df_show.empty:
+        st.info("Không có dữ liệu cho tháng và năm đã chọn.")
+        return
 
-    st.divider()
+    df_show["ngay_tra_ky_k"] = df_show["ngay_tra_ky_k"].dt.strftime("%d/%m/%Y")
+    df_show = df_show.rename(columns={
+        "san_pham": "Sản phẩm",
+        "ngay_tra_ky_k": "Ngày thu kỳ k",
+        "ky": "Kỳ",
+        "so_gcn": "Số HĐ kỳ k",
+        "da_tra_ky_tiep": "Đã trả kỳ tiếp",
+        "chua_tra_ky_tiep": "Chưa trả kỳ tiếp",
+        "ty_le_giu_chan_pct": "Duy trì đóng phí (%)",
+        "is_mature": "Đủ thành thục",
+    }).sort_values(["Sản phẩm", "Ngày thu kỳ k", "Kỳ"])
 
-    # ── Bảng 2: Duy trì đóng phí theo tháng (df_month) ──────────────────────
-    st.markdown("#### Duy trì đóng phí tháng-qua-tháng")
-
-    b2c1, b2c2, b2c3 = st.columns([2, 2, 2])
-    with b2c1:
-        mo_products = st.multiselect(
-            "Sản phẩm",
-            options=products,
-            default=products,
-            key="dt_mo_products",
-        )
-    with b2c2:
-        mo_min, mo_max = (
-            df_month["thang_tra_ky_k"].min().date(),
-            df_month["thang_tra_ky_k"].max().date(),
-        )
-        mo_range = st.date_input(
-            "Khoảng tháng",
-            value=(mo_min, mo_max),
-            min_value=mo_min,
-            max_value=mo_max,
-            key="dt_mo_range",
-        )
-    with b2c3:
-        mo_ky = st.multiselect(
-            "Kỳ",
-            options=list(range(2, 12)),
-            default=list(range(2, 12)),
-            key="dt_mo_ky",
-            format_func=lambda k: f"Kỳ {k}→{k+1}",
-        )
-
-    df_month_f = df_month[df_month["san_pham"].isin(mo_products) & df_month["ky"].isin(mo_ky)].copy()
-    if isinstance(mo_range, (list, tuple)) and len(mo_range) == 2:
-        df_month_f = df_month_f[
-            df_month_f["thang_tra_ky_k"].between(
-                pd.Timestamp(mo_range[0]), pd.Timestamp(mo_range[1])
-            )
-        ]
-
-    if df_month_f.empty:
-        st.info("Không có dữ liệu.")
-    else:
-        out = df_month_f.copy()
-        out["thang_tra_ky_k"] = out["thang_tra_ky_k"].dt.strftime("%Y-%m")
-        out = out.rename(columns={
-            "san_pham": "Sản phẩm",
-            "thang_tra_ky_k": "Tháng thu kỳ k",
-            "ky": "Kỳ k",
-            "so_gcn": "Số HĐ trả kỳ k",
-            "ty_le_giu_chan_pct": "Duy trì đóng phí (%)",
-        }).sort_values(["Sản phẩm", "Tháng thu kỳ k", "Kỳ k"])
-        st.dataframe(out, use_container_width=True, hide_index=True)
-
-    st.divider()
-
-    # ── Bảng 3: Duy trì đóng phí theo ngày (df_date) ────────────────────────
-    st.markdown("#### Duy trì đóng phí theo ngày")
-
-    b3c1, b3c2, b3c3 = st.columns([2, 2, 2])
-    with b3c1:
-        da_products = st.multiselect(
-            "Sản phẩm",
-            options=products,
-            default=products,
-            key="dt_da_products",
-        )
-    with b3c2:
-        da_min, da_max = (
-            df_date["ngay_tra_ky_k"].min().date(),
-            df_date["ngay_tra_ky_k"].max().date(),
-        )
-        da_range = st.date_input(
-            "Khoảng ngày",
-            value=(da_min, da_max),
-            min_value=da_min,
-            max_value=da_max,
-            key="dt_da_range",
-        )
-    with b3c3:
-        da_ky = st.multiselect(
-            "Kỳ",
-            options=list(range(2, 12)),
-            default=list(range(2, 12)),
-            key="dt_da_ky",
-            format_func=lambda k: f"Kỳ {k}→{k+1}",
-        )
-
-    df_date_f = df_date[df_date["san_pham"].isin(da_products) & df_date["ky"].isin(da_ky)].copy()
-    if isinstance(da_range, (list, tuple)) and len(da_range) == 2:
-        df_date_f = df_date_f[
-            df_date_f["ngay_tra_ky_k"].between(
-                pd.Timestamp(da_range[0]), pd.Timestamp(da_range[1])
-            )
-        ]
-
-    if df_date_f.empty:
-        st.info("Không có dữ liệu.")
-    else:
-        out = df_date_f.copy()
-        out["ngay_tra_ky_k"] = out["ngay_tra_ky_k"].dt.strftime("%d/%m/%Y")
-        out = out.rename(columns={
-            "san_pham": "Sản phẩm",
-            "ngay_tra_ky_k": "Ngày thu kỳ k",
-            "ky": "Kỳ k",
-            "so_gcn": "Số HĐ trả kỳ k",
-            "ty_le_giu_chan_pct": "Duy trì đóng phí (%)",
-        }).sort_values(["Sản phẩm", "Ngày thu kỳ k", "Kỳ k"])
-        st.dataframe(out, use_container_width=True, hide_index=True)
+    st.dataframe(
+        df_show,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Sản phẩm": st.column_config.TextColumn(
+                "Sản phẩm",
+                help="Tên sản phẩm bảo hiểm.",
+            ),
+            "Ngày thu kỳ k": st.column_config.TextColumn(
+                "Ngày thu kỳ k",
+                help="Ngày khách hàng thanh toán kỳ phí thứ k (Trạng thái đối soát = Thành công).",
+            ),
+            "Kỳ": st.column_config.NumberColumn(
+                "Kỳ",
+                help="Kỳ phí đã được thanh toán (kỳ 2 đến kỳ 11; kỳ 1 miễn phí không theo dõi).",
+                format="%d",
+            ),
+            "Số HĐ kỳ k": st.column_config.NumberColumn(
+                "Số HĐ kỳ k",
+                help="Số hợp đồng thanh toán kỳ k vào ngày này.",
+                format="%d",
+            ),
+            "Đã trả kỳ tiếp": st.column_config.NumberColumn(
+                "Đã trả kỳ tiếp",
+                help="Trong số HĐ trả kỳ k, số HĐ đã tiếp tục trả kỳ k+1 (bất kể ngày nào).",
+                format="%d",
+            ),
+            "Chưa trả kỳ tiếp": st.column_config.NumberColumn(
+                "Chưa trả kỳ tiếp",
+                help="Trong số HĐ trả kỳ k, số HĐ chưa trả kỳ k+1 tính đến thời điểm truy vấn.",
+                format="%d",
+            ),
+            "Duy trì đóng phí (%)": st.column_config.NumberColumn(
+                "Duy trì đóng phí (%)",
+                help=(
+                    "Tỉ lệ HĐ trả kỳ k tiếp tục trả kỳ k+1 (%).\n\n"
+                    "Chỉ đáng tin cậy khi cột 'Đủ thành thục' = ✓ "
+                    "(tức là ngày thu kỳ k + 30 ngày ≤ hôm nay, kỳ k+1 đã có đủ thời gian xảy ra)."
+                ),
+                format="%.1f",
+            ),
+            "Đủ thành thục": st.column_config.CheckboxColumn(
+                "Đủ thành thục",
+                help=(
+                    "TRUE khi ngày thu kỳ k + 30 ngày ≤ hôm nay, tức là kỳ k+1 "
+                    "đã có đủ thời gian để xảy ra. "
+                    "Các dòng chưa thành thục có tỉ lệ duy trì bị bias thấp do dữ liệu chưa đầy đủ."
+                ),
+            ),
+        },
+    )
 
 
 # ── Main render ───────────────────────────────────────────────────────────────
@@ -1176,15 +1038,14 @@ def render_payment_retention_page():
 
     st.divider()
 
-    # ── 4 tabs ────────────────────────────────────────────────────────────────
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+    # ── Tabs ─────────────────────────────────────────────────────────────────
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "Hiệu quả thu trong kỳ",
         "Sức khỏe danh mục",
         "Bản đồ thu phí",
         "Duy trì đóng phí theo kỳ",
-        "Xu hướng theo ngày",
         "Phân bố ngày trong tháng",
-        "Dữ liệu chi tiết",
+        "Trạng thái thu phí theo ngày",
     ])
 
     with tab1:
@@ -1200,10 +1061,7 @@ def render_payment_retention_page():
         _render_retention_curve(df_month, selected_products, min_gcn)
 
     with tab5:
-        _render_rolling_trend(df_date, selected_products, min_gcn)
-
-    with tab6:
         _render_dom_heatmap(df_date, selected_products, min_gcn)
 
-    with tab7:
-        _render_detail_tables(df_ky, df_month, df_date, selected_products)
+    with tab6:
+        _render_payment_date_table(df_date, selected_products)
