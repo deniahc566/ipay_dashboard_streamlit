@@ -381,7 +381,7 @@ def _render_q1_tab(df_ky: pd.DataFrame, products: list[str]) -> None:
         return
 
     # ── Chart 1: Xu hướng theo tháng hiệu lực ────────────────────────────────
-    st.markdown("##### Xu hướng tỉ lệ thu theo tháng")
+    st.markdown("##### Xu hướng tỉ lệ thu theo tháng hiệu lực")
     st.caption(
         "Tỉ lệ thu tổng hợp (kỳ 2+) theo tháng HĐ hiệu lực. "
         "3 tháng gần nhất bị ẩn: kỳ 2 đến hạn sau 60 ngày, cần thêm ~30 ngày để collection hoàn tất."
@@ -516,12 +516,6 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
         "Mẫu số: số HĐ đang có hiệu lực cuối tháng._"
     )
 
-    if "Cyber Risk" in products:
-        st.warning(
-            "**Lưu ý — Cyber Risk:** Số HĐ có hiệu lực không cập nhật từ đầu năm 2026 (lỗi API). "
-            "Tỉ lệ Cyber Risk từ tháng 01/2026 trở đi chỉ mang tính tham khảo."
-        )
-
     df = df_health[
         df_health["san_pham"].isin(products)
         & df_health["hieu_luc"].notna()
@@ -537,16 +531,16 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
     df["hl_fmt"]    = df["hieu_luc"].apply(lambda x: f"{int(x):,}")
 
     # ── Chart 1: Xu hướng theo tháng ─────────────────────────────────────────
-    st.markdown("##### Xu hướng sức khỏe danh mục theo tháng")
+    st.markdown("##### Xu hướng sức khỏe danh mục theo tháng thu phí")
     st.caption("% HĐ đang đóng phí / HĐ có hiệu lực theo từng tháng và sản phẩm.")
 
     trend = (
         alt.Chart(df)
         .mark_line(point=True, strokeWidth=2)
         .encode(
-            x=alt.X("thang:T", title="Tháng",
+            x=alt.X("thang:T",
                     timeUnit="yearmonth",
-                    axis=alt.Axis(format="%m/%Y", labelAngle=-45)),
+                    axis=alt.Axis(format="%m/%Y", labelAngle=-45, title=None)),
             y=alt.Y(
                 "ty_le_pct:Q",
                 title="% HĐ đang đóng phí",
