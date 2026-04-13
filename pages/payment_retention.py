@@ -126,15 +126,32 @@ def _scorecard_metrics(
         & (df_health["hieu_luc"] > 0)
     ]
     mature_month = df_health_filtered["thang"].max() if not df_health_filtered.empty else None
-    dh = df_health_filtered[df_health_filtered["thang"] == mature_month] if mature_month is not None else pd.DataFrame()
-    active_gcn     = int(dh["distinct_gcn"].sum()) if not dh.empty else None
-    active_hieu_luc = int(dh["hieu_luc"].sum())    if not dh.empty and dh["hieu_luc"].notna().any() else None
-    ty_le_active   = (
-        active_gcn / active_hieu_luc * 100
-        if active_gcn and active_hieu_luc and active_hieu_luc > 0
+
+    def _q2_rate(thang):
+        if thang is None:
+            return None, None, None
+        dh = df_health_filtered[df_health_filtered["thang"] == thang]
+        if dh.empty or not dh["hieu_luc"].notna().any():
+            return None, None, None
+        gcn = int(dh["distinct_gcn"].sum())
+        hl  = int(dh["hieu_luc"].sum())
+        rate = gcn / hl * 100 if hl > 0 else None
+        return gcn, hl, rate
+
+    active_gcn, active_hieu_luc, ty_le_active = _q2_rate(mature_month)
+    active_month_label = mature_month.strftime("%m/%Y") if mature_month is not None else "—"
+
+    prev_month = (
+        (mature_month - pd.DateOffset(months=1)).to_period("M").to_timestamp()
+        if mature_month is not None else None
+    )
+    _, _, ty_le_active_prev = _q2_rate(prev_month)
+    prev_month_label = prev_month.strftime("%m/%Y") if prev_month is not None else "—"
+    ty_le_active_delta = (
+        ty_le_active - ty_le_active_prev
+        if ty_le_active is not None and ty_le_active_prev is not None
         else None
     )
-    active_month_label = mature_month.strftime("%m/%Y") if mature_month is not None else "—"
 
     return dict(
         da_thu=int(da_thu), qua_han=int(qua_han), tong=int(tong),
@@ -144,6 +161,8 @@ def _scorecard_metrics(
         dropoff_ky=dropoff_ky, dropoff_val=dropoff_val,
         active_gcn=active_gcn, active_hieu_luc=active_hieu_luc,
         ty_le_active=ty_le_active, active_month_label=active_month_label,
+        ty_le_active_prev=ty_le_active_prev, prev_month_label=prev_month_label,
+        ty_le_active_delta=ty_le_active_delta,
     )
 
 
@@ -181,60 +200,8 @@ def _render_scorecard(
                     "nhóm quá mới (kỳ 2 chưa đủ thời gian thu, cần 90 ngày) và nhóm quá cũ (ít biến động).",
         ), unsafe_allow_html=True)
 
-    # Card 2: HĐ quá hạn
-    qh_pct = m["qua_han"] / m["tong"] * 100 if m["tong"] > 0 else 0
+    # Card 2: Q2 — Sức khỏe danh mục
     with c2:
-        st.markdown(kpi_card(
-            label="HỢP ĐỒNG QUÁ HẠN CHƯA THU",
-            value=f"{m['qua_han']:,}",
-            delta_str=f"{qh_pct:.1f}% tổng hợp đồng đang theo dõi",
-            delta_color="#c62828" if qh_pct > 30 else "#e65100" if qh_pct > 15 else "#2e7d32",
-            accent_color="#b71c1c",
-            subtitle=f"Tổng {m['tong']:,} hợp đồng đang theo dõi",
-        ), unsafe_allow_html=True)
-
-    # Card 3: Kỳ thu phí tốt nhất
-    if m["best_ky"] is not None:
-        best_ky_display = f"Kỳ {m['best_ky']} → {m['best_ky'] + 1}"
-        best_ky_ret_str = f"{m['best_ky_ret']:.1f}%"
-    else:
-        best_ky_display = "—"
-        best_ky_ret_str = "—"
-
-    with c3:
-        st.markdown(kpi_card(
-            label="KỲ THU PHÍ TỐT NHẤT",
-            value=best_ky_display,
-            delta_str=f"Duy trì: {best_ky_ret_str}",
-            delta_color="#2e7d32",
-            accent_color="#2e7d32",
-            subtitle="Kỳ khách hàng duy trì đóng phí tốt nhất",
-            tooltip="Kỳ thu phí có tỉ lệ duy trì đóng phí cao nhất, tính trên kỳ 2–11 "
-                    "của các tháng đã có đủ dữ liệu (mature).",
-        ), unsafe_allow_html=True)
-
-    # Card 4: Kỳ duy trì thấp nhất
-    if m["dropoff_ky"] is not None:
-        dropoff_val_str = f"{m['dropoff_val']:.1f}%" if m["dropoff_val"] is not None else "—"
-        dropoff_display = f"Kỳ {m['dropoff_ky']} → {m['dropoff_ky'] + 1}"
-        dropoff_sub = f"Duy trì: {dropoff_val_str}"
-    else:
-        dropoff_display = "—"
-        dropoff_sub = "Chưa đủ dữ liệu"
-
-    with c4:
-        st.markdown(kpi_card(
-            label="KỲ DỄ NGHỈ NHẤT",
-            value=dropoff_display,
-            delta_str=f"Duy trì: {dropoff_val_str if m['dropoff_ky'] else '—'}",
-            delta_color="#e65100",
-            accent_color="#e65100",
-            subtitle="Kỳ khách hàng dễ dừng đóng phí nhất",
-            tooltip="Kỳ mà tỉ lệ tiếp tục đóng phí thấp nhất, tính trên các tháng đã có đủ dữ liệu (kỳ 2–11).",
-        ), unsafe_allow_html=True)
-
-    # Card 5: Q2 — Sức khỏe danh mục
-    with c5:
         if m["ty_le_active"] is not None:
             active_val   = f"{m['ty_le_active']:.1f}%"
             active_sub   = (
@@ -246,19 +213,81 @@ def _render_scorecard(
                 else "#e65100" if m["ty_le_active"] >= 50
                 else "#c62828"
             )
+            if m["ty_le_active_delta"] is not None:
+                sign = "▲" if m["ty_le_active_delta"] >= 0 else "▼"
+                d_color = "#2e7d32" if m["ty_le_active_delta"] >= 0 else "#c62828"
+                active_delta_str = (
+                    f"{sign} {abs(m['ty_le_active_delta']):.1f} điểm % so với {m['prev_month_label']}"
+                )
+            else:
+                active_delta_str = active_sub
+                d_color = active_color
         else:
-            active_val   = "—"
-            active_sub   = "Chưa đủ dữ liệu"
-            active_color = "#888"
+            active_val        = "—"
+            active_sub        = "Chưa đủ dữ liệu"
+            active_delta_str  = "—"
+            active_color      = "#888"
+            d_color           = "#888"
         st.markdown(kpi_card(
             label="SỨC KHỎE DANH MỤC",
             value=active_val,
-            delta_str=active_sub,
-            delta_color=active_color,
+            delta_str=active_delta_str,
+            delta_color=d_color,
             accent_color="#6a1b9a",
-            subtitle="HĐ đang đóng phí / HĐ đang có hiệu lực",
+            subtitle=active_sub if m["ty_le_active"] is not None else "Chưa đủ dữ liệu",
             tooltip="Số hợp đồng đã trả ít nhất 1 kỳ trong tháng / Số hợp đồng đang hiệu lực. "
                     "Lưu ý: số HĐ hiệu lực của Cyber Risk không cập nhật từ đầu năm 2026.",
+        ), unsafe_allow_html=True)
+
+    # Card 3: HĐ quá hạn
+    qh_pct = m["qua_han"] / m["tong"] * 100 if m["tong"] > 0 else 0
+    with c3:
+        st.markdown(kpi_card(
+            label="HỢP ĐỒNG QUÁ HẠN CHƯA THU",
+            value=f"{m['qua_han']:,}",
+            delta_str=f"{qh_pct:.1f}% tổng hợp đồng đang theo dõi",
+            delta_color="#c62828" if qh_pct > 30 else "#e65100" if qh_pct > 15 else "#2e7d32",
+            accent_color="#b71c1c",
+            subtitle=f"Tổng {m['tong']:,} hợp đồng đang theo dõi",
+        ), unsafe_allow_html=True)
+
+    # Card 4: Kỳ thu phí tốt nhất
+    if m["best_ky"] is not None:
+        best_ky_display = f"Kỳ {m['best_ky']} → {m['best_ky'] + 1}"
+        best_ky_ret_str = f"{m['best_ky_ret']:.1f}%"
+    else:
+        best_ky_display = "—"
+        best_ky_ret_str = "—"
+
+    with c4:
+        st.markdown(kpi_card(
+            label="KỲ THU PHÍ TỐT NHẤT",
+            value=best_ky_display,
+            delta_str=f"Duy trì: {best_ky_ret_str}",
+            delta_color="#2e7d32",
+            accent_color="#2e7d32",
+            subtitle="Kỳ khách hàng duy trì đóng phí tốt nhất",
+            tooltip="Kỳ thu phí có tỉ lệ duy trì đóng phí cao nhất, tính trên kỳ 2–11 "
+                    "của các tháng đã có đủ dữ liệu (mature).",
+        ), unsafe_allow_html=True)
+
+    # Card 5: Kỳ duy trì thấp nhất
+    if m["dropoff_ky"] is not None:
+        dropoff_val_str = f"{m['dropoff_val']:.1f}%" if m["dropoff_val"] is not None else "—"
+        dropoff_display = f"Kỳ {m['dropoff_ky']} → {m['dropoff_ky'] + 1}"
+    else:
+        dropoff_val_str = "—"
+        dropoff_display = "—"
+
+    with c5:
+        st.markdown(kpi_card(
+            label="KỲ DỄ NGHỈ NHẤT",
+            value=dropoff_display,
+            delta_str=f"Duy trì: {dropoff_val_str}",
+            delta_color="#e65100",
+            accent_color="#e65100",
+            subtitle="Kỳ khách hàng dễ dừng đóng phí nhất",
+            tooltip="Kỳ mà tỉ lệ tiếp tục đóng phí thấp nhất, tính trên các tháng đã có đủ dữ liệu (kỳ 2–11).",
         ), unsafe_allow_html=True)
 
     st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
@@ -319,8 +348,8 @@ def _render_scorecard(
                 "HĐ quá hạn":          f"{int(q):,}",
                 "Sức khỏe danh mục":   ty_le_active_sp,
                 "Kỳ thu phí tốt nhất": f"Kỳ {best_ky_sp}→{best_ky_sp+1} ({best_ky_ret_sp:.1f}%)" if best_ky_sp else "—",
-                "Duy trì đóng phí TB (%)":   f"{ret_all:.1f}" if pd.notna(ret_all) else "—",
                 "Kỳ dễ nghỉ nhất":     f"Kỳ {dp_ky_val}→{dp_ky_val+1} ({dp_ret:.1f}%)" if dp_ky_val else "—",
+                "Duy trì đóng phí TB (%)": f"{ret_all:.1f}" if pd.notna(ret_all) else "—",
             })
 
         if rows:
