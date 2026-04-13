@@ -387,7 +387,9 @@ def _render_q1_tab(df_ky: pd.DataFrame, products: list[str]) -> None:
         alt.Chart(wide_trend)
         .mark_line(point=True, strokeWidth=2)
         .encode(
-            x=alt.X("cohort_month:T", title="Tháng HĐ hiệu lực"),
+            x=alt.X("cohort_month:T", title="Tháng HĐ hiệu lực",
+                    timeUnit="yearmonth",
+                    axis=alt.Axis(format="%m/%Y", labelAngle=-45)),
             y=alt.Y(
                 "ty_le_pct:Q",
                 title="Tỉ lệ thu (%)",
@@ -509,7 +511,9 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
         alt.Chart(df)
         .mark_line(point=True, strokeWidth=2)
         .encode(
-            x=alt.X("thang:T", title="Tháng"),
+            x=alt.X("thang:T", title="Tháng",
+                    timeUnit="yearmonth",
+                    axis=alt.Axis(format="%m/%Y", labelAngle=-45)),
             y=alt.Y(
                 "ty_le_pct:Q",
                 title="% HĐ đang đóng phí",
