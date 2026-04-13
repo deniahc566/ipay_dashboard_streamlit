@@ -349,10 +349,10 @@ def _render_scorecard(
 
             rows.append({
                 "Sản phẩm":            sp,
-                "Thu phí theo T.hiệu lực (%)": f"{tl:.1f}",
+                "Thu phí theo Tháng hiệu lực (%)": f"{tl:.1f}",
                 "HĐ đã thu":           f"{int(d):,}",
                 "HĐ quá hạn":          f"{int(q):,}",
-                "Thu phí theo T.thu phí (%)": ty_le_active_sp,
+                "Thu phí theo Tháng thu phí (%)": ty_le_active_sp,
                 "Kỳ thu phí tốt nhất": f"Kỳ {best_ky_sp}→{best_ky_sp+1} ({best_ky_ret_sp:.1f}%)" if best_ky_sp else "—",
                 "Kỳ dễ nghỉ nhất":     f"Kỳ {dp_ky_val}→{dp_ky_val+1} ({dp_ret:.1f}%)" if dp_ky_val else "—",
                 "Duy trì đóng phí TB (%)": f"{ret_all:.1f}" if pd.notna(ret_all) else "—",
