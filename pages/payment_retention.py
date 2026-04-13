@@ -854,7 +854,7 @@ def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> No
 
     df_filtered = df_date[df_date["san_pham"].isin(products)].copy()
 
-    # ── Filters: Năm → Tháng → Ngày ─────────────────────────────────────────
+    # ── Filters: Năm | Tháng | Kỳ thu phí ───────────────────────────────────
     available_years = sorted(df_filtered["ngay_tra_ky_k"].dt.year.unique(), reverse=True)
 
     fc1, fc2, fc3 = st.columns([1, 1, 2])
@@ -874,47 +874,41 @@ def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> No
             format_func=lambda m: _MONTH_NAMES.get(m, f"Tháng {m}"),
         )
 
-    # Data cho cả tháng — dùng cho charts
+    # Data cả tháng — dùng cho charts và bảng
     df_month_data = df_filtered[
         (df_filtered["ngay_tra_ky_k"].dt.year == selected_year)
         & (df_filtered["ngay_tra_ky_k"].dt.month == selected_month)
     ].copy()
 
     with fc3:
-        available_days = sorted(df_month_data["ngay_tra_ky_k"].dt.day.unique())
-        selected_days = st.multiselect(
-            "Ngày (chỉ lọc bảng)",
-            options=available_days,
-            default=available_days,
-            key="pdt_days",
-            format_func=lambda d: f"{d:02d}",
+        available_ky = sorted(df_month_data["ky"].unique())
+        selected_ky = st.multiselect(
+            "Kỳ thu phí",
+            options=available_ky,
+            default=available_ky,
+            key="pdt_ky",
+            format_func=lambda k: f"Kỳ {k}",
         )
 
     if df_month_data.empty:
         st.info("Không có dữ liệu cho tháng và năm đã chọn.")
         return
 
-    # ── Kỳ selector cho biểu đồ ─────────────────────────────────────────────
-    available_ky = sorted(df_month_data["ky"].unique())
-    ck1, _ = st.columns([1, 3])
-    with ck1:
-        selected_ky = st.selectbox(
-            "Kỳ thu phí (biểu đồ)",
-            options=available_ky,
-            index=0,
-            key="pdt_chart_ky",
-            format_func=lambda k: f"Kỳ {k} → {k + 1}",
-        )
-
-    df_chart = df_month_data[df_month_data["ky"] == selected_ky].copy()
+    df_chart = df_month_data[
+        df_month_data["ky"].isin(selected_ky) if selected_ky else df_month_data["ky"].isin([])
+    ].copy()
     df_chart["ngay"] = df_chart["ngay_tra_ky_k"].dt.day
+
+    ky_label = (
+        f"Kỳ {min(selected_ky)}–{max(selected_ky)}" if selected_ky else "—"
+    )
 
     # ── Biểu đồ ─────────────────────────────────────────────────────────────
     col_left, col_right = st.columns(2)
 
     # Chart 1: Stacked bar — Số GCN đã/chưa thu kỳ tiếp
     with col_left:
-        st.markdown(f"##### Số GCN theo ngày — Kỳ {selected_ky}→{selected_ky + 1}")
+        st.markdown(f"##### Số GCN theo ngày — {ky_label}")
         agg = (
             df_chart.groupby("ngay")
             .agg(da_thu=("da_tra_ky_tiep", "sum"), chua_thu=("chua_tra_ky_tiep", "sum"))
@@ -956,7 +950,7 @@ def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> No
 
     # Chart 2: Line — Tỉ lệ duy trì thu phí (chỉ is_mature)
     with col_right:
-        st.markdown(f"##### Tỉ lệ duy trì thu phí — Kỳ {selected_ky}→{selected_ky + 1}")
+        st.markdown(f"##### Tỉ lệ duy trì thu phí — {ky_label}")
         df_line = df_chart[df_chart["is_mature"]].copy()
         if df_line.empty:
             st.info("Chưa có ngày nào đã quá 30 ngày trong tháng này.")
@@ -1003,13 +997,24 @@ def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> No
 
     st.divider()
 
-    # ── Bảng — lọc thêm theo Ngày ────────────────────────────────────────────
-    df_show = df_month_data.copy()
+    # ── Bảng — lọc theo Kỳ + Ngày ────────────────────────────────────────────
+    df_show = df_month_data[
+        df_month_data["ky"].isin(selected_ky) if selected_ky else df_month_data["ky"].isin([])
+    ].copy()
+
+    available_days = sorted(df_show["ngay_tra_ky_k"].dt.day.unique())
+    selected_days = st.multiselect(
+        "Ngày",
+        options=available_days,
+        default=available_days,
+        key="pdt_days",
+        format_func=lambda d: f"{d:02d}",
+    )
     if selected_days:
         df_show = df_show[df_show["ngay_tra_ky_k"].dt.day.isin(selected_days)]
 
     if df_show.empty:
-        st.info("Không có dữ liệu cho ngày đã chọn.")
+        st.info("Không có dữ liệu cho lựa chọn đã chọn.")
         return
 
     df_show["ngay_tra_ky_k"] = df_show["ngay_tra_ky_k"].dt.strftime("%d/%m/%Y")
