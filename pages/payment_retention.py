@@ -120,8 +120,12 @@ def _scorecard_metrics(
     ret_overall = fm_all["ty_le_giu_chan_pct"].mean() if not fm_all.empty else None
 
     # Q2 — Sức khỏe danh mục: distinct GCN đang đóng phí / GCN có hiệu lực
-    # Dùng tháng mới nhất có data cho các sản phẩm đang chọn
-    df_health_filtered = df_health[df_health["san_pham"].isin(products)]
+    # Dùng tháng mới nhất có đủ cả distinct_gcn lẫn hieu_luc cho các sản phẩm đang chọn
+    df_health_filtered = df_health[
+        df_health["san_pham"].isin(products)
+        & df_health["hieu_luc"].notna()
+        & (df_health["hieu_luc"] > 0)
+    ]
     mature_month = df_health_filtered["thang"].max() if not df_health_filtered.empty else None
     dh = df_health_filtered[df_health_filtered["thang"] == mature_month] if mature_month is not None else pd.DataFrame()
     active_gcn     = int(dh["distinct_gcn"].sum()) if not dh.empty else None
