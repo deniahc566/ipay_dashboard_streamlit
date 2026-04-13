@@ -196,23 +196,21 @@ def _render_scorecard(
         ), unsafe_allow_html=True)
 
     # Card 3: Kỳ thu phí tốt nhất
-    best_ret_str = f"{m['best_ky_ret']:.1f}%" if m["best_ky_ret"] is not None else "—"
-    best_ky_label = f"Kỳ {m['best_ky']}→{m['best_ky'] + 1}" if m["best_ky"] is not None else "—"
-    best_delta_str = ""
-    best_delta_color = "#888"
-    if m["best_ky_delta"] is not None:
-        sign = "▲" if m["best_ky_delta"] >= 0 else "▼"
-        best_delta_color = "#2e7d32" if m["best_ky_delta"] >= 0 else "#c62828"
-        best_delta_str = f"{sign} {abs(m['best_ky_delta']):.1f} điểm % so với tháng trước"
+    if m["best_ky"] is not None:
+        best_ky_display = f"Kỳ {m['best_ky']} → {m['best_ky'] + 1}"
+        best_ky_ret_str = f"{m['best_ky_ret']:.1f}%"
+    else:
+        best_ky_display = "—"
+        best_ky_ret_str = "—"
 
     with c3:
         st.markdown(kpi_card(
             label="KỲ THU PHÍ TỐT NHẤT",
-            value=best_ret_str,
-            delta_str=best_delta_str or "—",
-            delta_color=best_delta_color,
-            accent_color="#1b5e20",
-            subtitle=best_ky_label + " · Trung bình các tháng có đủ dữ liệu",
+            value=best_ky_display,
+            delta_str=f"Duy trì: {best_ky_ret_str}",
+            delta_color="#2e7d32",
+            accent_color="#2e7d32",
+            subtitle="Kỳ khách hàng duy trì đóng phí tốt nhất",
             tooltip="Kỳ thu phí có tỉ lệ duy trì đóng phí cao nhất, tính trên kỳ 2–11 "
                     "của các tháng đã có đủ dữ liệu (mature).",
         ), unsafe_allow_html=True)
