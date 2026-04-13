@@ -905,7 +905,7 @@ def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> No
         "da_tra_ky_tiep": "Đã trả kỳ tiếp",
         "chua_tra_ky_tiep": "Chưa trả kỳ tiếp",
         "ty_le_giu_chan_pct": "Duy trì đóng phí (%)",
-        "is_mature": "Đủ thành thục",
+        "is_mature": "Đã quá 30 ngày",
     }).sort_values(["Sản phẩm", "Ngày thu kỳ k", "Kỳ"])
 
     st.dataframe(
@@ -945,17 +945,17 @@ def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> No
                 "Duy trì đóng phí (%)",
                 help=(
                     "Tỉ lệ HĐ trả kỳ k tiếp tục trả kỳ k+1 (%).\n\n"
-                    "Chỉ đáng tin cậy khi cột 'Đủ thành thục' = ✓ "
+                    "Chỉ đáng tin cậy khi cột 'Đã quá 30 ngày' = ✓ "
                     "(tức là ngày thu kỳ k + 30 ngày ≤ hôm nay, kỳ k+1 đã có đủ thời gian xảy ra)."
                 ),
                 format="%.1f",
             ),
-            "Đủ thành thục": st.column_config.CheckboxColumn(
-                "Đủ thành thục",
+            "Đã quá 30 ngày": st.column_config.CheckboxColumn(
+                "Đã quá 30 ngày",
                 help=(
                     "TRUE khi ngày thu kỳ k + 30 ngày ≤ hôm nay, tức là kỳ k+1 "
                     "đã có đủ thời gian để xảy ra. "
-                    "Các dòng chưa thành thục có tỉ lệ duy trì bị bias thấp do dữ liệu chưa đầy đủ."
+                    "Các dòng chưa đủ 30 ngày có tỉ lệ duy trì bị bias thấp do dữ liệu chưa đầy đủ."
                 ),
             ),
         },
