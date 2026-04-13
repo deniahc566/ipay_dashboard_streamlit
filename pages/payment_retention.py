@@ -298,10 +298,13 @@ def _render_scorecard(
         cohort_min = (pd.Timestamp.now() - pd.DateOffset(months=8)).to_period("M").to_timestamp()
         cohort_max = (pd.Timestamp.now() - pd.DateOffset(months=3)).to_period("M").to_timestamp()
         cutoff_month = (pd.Timestamp.now() - pd.DateOffset(months=1)).to_period("M").to_timestamp()
-        mature_month = (
-            (pd.Timestamp.now().normalize() - pd.Timedelta(days=60))
-            .to_period("M").to_timestamp()
-        )
+        # Dùng max thang từ data (giống scorecard), không hardcode offset
+        _dh_all = df_health[
+            df_health["san_pham"].isin(products)
+            & df_health["hieu_luc"].notna()
+            & (df_health["hieu_luc"] > 0)
+        ]
+        mature_month = _dh_all["thang"].max() if not _dh_all.empty else None
 
         for sp in sorted(products):
             # Q1: chỉ dùng cohort 3–8 tháng trước
@@ -329,11 +332,14 @@ def _render_scorecard(
                 dp_ky_val = int(avg_by_ky.idxmin())
                 dp_ret = avg_by_ky.min()
 
-            # Q2: sức khỏe danh mục tháng mature gần nhất
-            sp_h = df_health[
-                (df_health["san_pham"] == sp)
-                & (df_health["thang"] == mature_month)
-            ]
+            # Q2: sức khỏe danh mục tháng mature gần nhất (cùng logic scorecard)
+            sp_h = (
+                df_health[
+                    (df_health["san_pham"] == sp)
+                    & (df_health["thang"] == mature_month)
+                ]
+                if mature_month is not None else pd.DataFrame()
+            )
             if not sp_h.empty and sp_h["hieu_luc"].notna().any():
                 gcn_paying = int(sp_h["distinct_gcn"].iloc[0])
                 hl = int(sp_h["hieu_luc"].iloc[0])
@@ -420,7 +426,7 @@ def _render_q1_tab(df_ky: pd.DataFrame, products: list[str]) -> None:
             y=alt.Y(
                 "ty_le_pct:Q",
                 title="Tỉ lệ thu (%)",
-                scale=alt.Scale(domain=[0, 100]),
+                scale=alt.Scale(zero=False),
             ),
             color=alt.Color(
                 "san_pham:N",
@@ -476,7 +482,7 @@ def _render_q1_tab(df_ky: pd.DataFrame, products: list[str]) -> None:
             y=alt.Y(
                 "ty_le_pct:Q",
                 title="Tỉ lệ thu (%)",
-                scale=alt.Scale(domain=[0, 100]),
+                scale=alt.Scale(zero=False),
             ),
             color=alt.Color(
                 "san_pham:N",
@@ -544,7 +550,7 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
             y=alt.Y(
                 "ty_le_pct:Q",
                 title="% HĐ đang đóng phí",
-                scale=alt.Scale(domain=[0, 100]),
+                scale=alt.Scale(zero=False),
             ),
             color=alt.Color(
                 "san_pham:N",
@@ -585,7 +591,7 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
                 y=alt.Y(
                     "ty_le_pct:Q",
                     title="% HĐ đang đóng phí",
-                    scale=alt.Scale(domain=[0, 100]),
+                    scale=alt.Scale(zero=False),
                 ),
                 color=alt.Color(
                     "san_pham:N",
@@ -738,7 +744,7 @@ def _render_retention_curve(df_month: pd.DataFrame, products: list[str], min_gcn
                 y=alt.Y(
                     "ty_le_giu_chan_pct:Q",
                     title="Duy trì đóng phí (%)",
-                    scale=alt.Scale(domain=[0, 105]),
+                    scale=alt.Scale(zero=False),
                 ),
                 detail="thang_str:N",
                 tooltip=[
@@ -787,88 +793,6 @@ def _render_retention_curve(df_month: pd.DataFrame, products: list[str], min_gcn
 
 # ── Chart 3: Day-of-Month Heatmap ────────────────────────────────────────────
 
-def _render_dom_heatmap(df_date: pd.DataFrame, products: list[str], min_gcn: int):
-    col_left, col_right = st.columns(2)
-
-    with col_left:
-        st.markdown("#### Số HĐ thu theo ngày trong tháng")
-        st.caption("Trung bình số hợp đồng thu phí theo ngày trong tháng × kỳ. "
-                   "Cho thấy ngày nào dồn nhiều giao dịch nhất.")
-
-    with col_right:
-        st.markdown("#### Duy trì đóng phí theo ngày trong tháng")
-        st.caption("Tỉ lệ duy trì đóng phí trung bình theo ngày trong tháng × kỳ. "
-                   "Hợp đồng thu vào cuối tháng có duy trì thấp hơn không?")
-
-    df = df_date[
-        df_date["san_pham"].isin(products)
-        & (df_date["so_gcn"] >= min_gcn)
-    ].copy()
-
-    if df.empty:
-        st.info("Không có dữ liệu.")
-        return
-
-    df["ngay_trong_thang"] = df["ngay_tra_ky_k"].dt.day
-
-    dom = (
-        df.groupby(["ngay_trong_thang", "ky"])
-        .agg(
-            avg_gcn=("so_gcn", "mean"),
-            avg_retention=("ty_le_giu_chan_pct", "mean"),
-        )
-        .reset_index()
-    )
-    dom["avg_gcn"] = dom["avg_gcn"].round(0)
-    dom["avg_retention"] = dom["avg_retention"].round(2)
-
-    base = alt.Chart(dom).encode(
-        x=alt.X(
-            "ngay_trong_thang:O",
-            title="Ngày trong tháng",
-            axis=alt.Axis(labelAngle=0),
-        ),
-        y=alt.Y("ky:O", title="Kỳ thu", sort="descending"),
-    )
-
-    with col_left:
-        vol_chart = base.mark_rect(stroke="white", strokeWidth=0.3).encode(
-            color=alt.Color(
-                "avg_gcn:Q",
-                scale=alt.Scale(scheme="blues"),
-                title="HĐ/ngày (TB)",
-                legend=alt.Legend(format=".0f"),
-            ),
-            tooltip=[
-                alt.Tooltip("ngay_trong_thang:O", title="Ngày"),
-                alt.Tooltip("ky:O", title="Kỳ"),
-                alt.Tooltip("avg_gcn:Q", title="Số HĐ trung bình/ngày", format=",.0f"),
-            ],
-        ).properties(height=300)
-        st.altair_chart(vol_chart, use_container_width=True)
-
-    with col_right:
-        r_min = dom["avg_retention"].min()
-        r_max = dom["avg_retention"].max()
-        # Stretch domain to actual data range so variation is visible
-        r_domain = [r_min, r_max] if r_max > r_min else [max(0, r_min - 0.01), r_max]
-        ret_chart = base.mark_rect(stroke="white", strokeWidth=0.3).encode(
-            color=alt.Color(
-                "avg_retention:Q",
-                scale=alt.Scale(scheme="redyellowgreen", domain=r_domain, clamp=True),
-                title="Duy trì đóng phí TB (%)",
-                legend=alt.Legend(format=".2f"),
-            ),
-            tooltip=[
-                alt.Tooltip("ngay_trong_thang:O", title="Ngày"),
-                alt.Tooltip("ky:O", title="Kỳ"),
-                alt.Tooltip("avg_retention:Q", title="Duy trì đóng phí TB (%)", format=".1f"),
-                alt.Tooltip("avg_gcn:Q", title="Số HĐ trung bình/ngày", format=",.0f"),
-            ],
-        ).properties(height=300)
-        st.altair_chart(ret_chart, use_container_width=True)
-
-
 # ── Tab: Trạng thái thu phí theo ngày ───────────────────────────────────────
 
 _MONTH_NAMES = {
@@ -898,8 +822,14 @@ def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> No
             ].dt.month.unique(),
             reverse=True,
         )
+        _prev_month_num = (pd.Timestamp.now() - pd.DateOffset(months=1)).month
+        _default_month_idx = (
+            months_in_year.index(_prev_month_num)
+            if _prev_month_num in months_in_year
+            else 0
+        )
         selected_month = st.selectbox(
-            "Tháng", options=months_in_year, index=0, key="pdt_month",
+            "Tháng", options=months_in_year, index=_default_month_idx, key="pdt_month",
             format_func=lambda m: _MONTH_NAMES.get(m, f"Tháng {m}"),
         )
 
@@ -1136,16 +1066,16 @@ def render_payment_retention_page():
         return
 
     # ── Global filters ────────────────────────────────────────────────────────
-    f_col1, f_col2, f_col3 = st.columns([3, 2, 1])
-    with f_col1:
-        selected_products = st.multiselect(
-            "Sản phẩm",
-            options=_PRODUCTS,
-            default=_PRODUCTS,
-            key="ret_products",
-        )
+    selected_products = st.segmented_control(
+        "Sản phẩm",
+        options=_PRODUCTS,
+        default=_PRODUCTS,
+        selection_mode="multi",
+        key="ret_products",
+    )
+
+    f_col2, f_col3 = st.columns([3, 1])
     with f_col2:
-        # Date range from df_date
         d_min = df_date["ngay_tra_ky_k"].min().date()
         d_max = df_date["ngay_tra_ky_k"].max().date()
         date_range = st.date_input(
@@ -1191,12 +1121,11 @@ def render_payment_retention_page():
     st.divider()
 
     # ── Tabs ─────────────────────────────────────────────────────────────────
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "Hiệu quả thu trong kỳ",
         "Sức khỏe danh mục",
         "Bản đồ thu phí",
         "Duy trì đóng phí theo kỳ",
-        "Phân bố ngày trong tháng",
         "Trạng thái thu phí theo ngày",
     ])
 
@@ -1213,7 +1142,4 @@ def render_payment_retention_page():
         _render_retention_curve(df_month, selected_products, min_gcn)
 
     with tab5:
-        _render_dom_heatmap(df_date, selected_products, min_gcn)
-
-    with tab6:
         _render_payment_date_table(df_date, selected_products)
