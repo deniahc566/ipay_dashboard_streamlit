@@ -613,7 +613,7 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
 # ── Retention Curve ───────────────────────────────────────────────────────────
 
 def _render_retention_curve(df_ky: pd.DataFrame, df_month: pd.DataFrame, products: list[str], min_gcn: int):
-    st.markdown("#### Tỷ lệ HĐ còn lại qua từng kỳ")
+    st.markdown("#### Tỷ lệ GCN còn thu phí qua từng kỳ")
     st.caption(
         "Kỳ 2 = 100% (tất cả HĐ bắt đầu đóng phí). "
         "Mỗi đường mờ = tỷ lệ còn lại theo rates của 1 tháng. Đường đậm = trung bình."
@@ -700,12 +700,22 @@ def _render_retention_curve(df_ky: pd.DataFrame, df_month: pd.DataFrame, product
                 y="survival_pct:Q",
                 tooltip=[
                     alt.Tooltip("ky:O", title="Kỳ"),
-                    alt.Tooltip("survival_pct:Q", title="% HĐ còn lại TB", format=".1f"),
+                    alt.Tooltip("survival_pct:Q", title="% GCN còn lại TB", format=".1f"),
                 ],
             )
         )
 
-        chart = (faint_lines + avg_line + avg_points).properties(title=sp, height=280)
+        avg_labels = (
+            alt.Chart(avg_surv_df)
+            .mark_text(dy=-12, fontSize=11, color=color)
+            .encode(
+                x="ky:O",
+                y="survival_pct:Q",
+                text=alt.Text("survival_pct:Q", format=".1f"),
+            )
+        )
+
+        chart = (faint_lines + avg_line + avg_points + avg_labels).properties(title=sp, height=280)
         with cols[i % 2]:
             st.altair_chart(chart, use_container_width=True)
 
