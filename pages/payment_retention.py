@@ -976,11 +976,22 @@ def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> No
 # ── Main render ───────────────────────────────────────────────────────────────
 
 def render_payment_retention_page():
-    st.markdown(
-        '<h1 style="font-size:1.4rem;font-weight:700;margin-bottom:0.5rem;">'
-        "PHÂN TÍCH THU PHÍ VÀ DUY TRÌ ĐÓNG PHÍ THEO KỲ</h1>",
-        unsafe_allow_html=True,
-    )
+    col_title, col_refresh = st.columns([9, 1])
+    with col_title:
+        st.markdown(
+            '<h1 style="font-size:1.4rem;font-weight:700;margin-bottom:0.5rem;">'
+            "PHÂN TÍCH THU PHÍ VÀ DUY TRÌ ĐÓNG PHÍ THEO KỲ</h1>",
+            unsafe_allow_html=True,
+        )
+    with col_refresh:
+        if st.button(
+            "⟳ Làm mới",
+            use_container_width=True,
+            help="Xóa cache và tải lại dữ liệu mới nhất từ MotherDuck",
+        ):
+            load_all_payment_tracking.clear()
+            load_portfolio_health.clear()
+            st.rerun()
 
     # ── Load data ─────────────────────────────────────────────────────────────
     try:
