@@ -55,13 +55,9 @@ def _scorecard_metrics(
     """Tính toán các chỉ số tổng hợp cho scorecard."""
     fky = df_ky[df_ky["san_pham"].isin(products)]
 
-    # Q1 — Hiệu quả thu trong kỳ: chỉ dùng cohort 3–8 tháng trước
-    # Tránh: cohort quá mới (kỳ 2 đến hạn cohort+60 ngày, cần thêm 30 ngày buffer
-    #        → cần cohort cũ hơn 90 ngày / 3 tháng để không bị recency bias)
-    #        cohort quá cũ (survivor bias)
-    cohort_min = (pd.Timestamp.now() - pd.DateOffset(months=8)).to_period("M").to_timestamp()
+    # Q1 — Hiệu quả thu trong kỳ: bỏ qua cohort < 3 tháng (kỳ 2 chưa đủ thời gian thu)
     cohort_max = (pd.Timestamp.now() - pd.DateOffset(months=3)).to_period("M").to_timestamp()
-    fky_q1 = fky[fky["cohort_month"].between(cohort_min, cohort_max)]
+    fky_q1 = fky[fky["cohort_month"] <= cohort_max]
 
     da_thu  = fky_q1.loc[fky_q1["trang_thai"] == "da_thu",           "so_gcn"].sum()
     qua_han = fky_q1.loc[fky_q1["trang_thai"] == "chua_thu_qua_han", "so_gcn"].sum()
@@ -191,11 +187,10 @@ def _render_scorecard(
             delta_str=ty_le_delta_str or "—",
             delta_color=ty_le_delta_color,
             accent_color="#1565C0",
-            subtitle=f"Nhóm HĐ hiệu lực 3–8 tháng trước · {m['da_thu']:,}/{m['tong']:,} HĐ",
+            subtitle=f"HĐ hiệu lực từ đầu đến 3 tháng trước · {m['da_thu']:,}/{m['tong']:,} HĐ",
             tooltip="Trong số các hợp đồng đã đến hạn phải trả kỳ này, "
                     "bao nhiêu % thực sự đã trả? "
-                    "Chỉ tính nhóm hiệu lực 3–8 tháng trước để loại bỏ "
-                    "nhóm quá mới (kỳ 2 chưa đủ thời gian thu, cần 90 ngày) và nhóm quá cũ (ít biến động).",
+                    "Loại trừ cohort < 3 tháng tuổi (kỳ 2 chưa đủ thời gian thu, cần 90 ngày).",
         ), unsafe_allow_html=True)
 
     # Card 2: Q2 — Sức khỏe danh mục
@@ -293,7 +288,6 @@ def _render_scorecard(
     # ── Row 2: Per-product breakdown ──────────────────────────────────────────
     with st.expander("Chi tiết theo sản phẩm", expanded=True):
         rows = []
-        cohort_min = (pd.Timestamp.now() - pd.DateOffset(months=8)).to_period("M").to_timestamp()
         cohort_max = (pd.Timestamp.now() - pd.DateOffset(months=3)).to_period("M").to_timestamp()
         cutoff_month = (pd.Timestamp.now() - pd.DateOffset(months=1)).to_period("M").to_timestamp()
         # Dùng max thang từ data (giống scorecard), không hardcode offset
@@ -305,10 +299,10 @@ def _render_scorecard(
         mature_month = _dh_all["thang"].max() if not _dh_all.empty else None
 
         for sp in sorted(products):
-            # Q1: chỉ dùng cohort 3–8 tháng trước
+            # Q1: loại trừ cohort < 3 tháng tuổi
             sp_ky = df_ky[
                 (df_ky["san_pham"] == sp)
-                & df_ky["cohort_month"].between(cohort_min, cohort_max)
+                & (df_ky["cohort_month"] <= cohort_max)
             ]
             d = sp_ky.loc[sp_ky["trang_thai"] == "da_thu",           "so_gcn"].sum()
             q = sp_ky.loc[sp_ky["trang_thai"] == "chua_thu_qua_han", "so_gcn"].sum()
