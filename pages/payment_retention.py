@@ -851,12 +851,6 @@ _MONTH_NAMES = {
 
 def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> None:
     st.markdown("#### Trạng thái thu phí theo ngày")
-    st.caption(
-        "Bảng chi tiết từ bảng `silver.payment_tracking_by_payment_date`. "
-        "Mỗi dòng là một ngày × sản phẩm × kỳ thu. "
-        "Cột **Đủ thành thục** cho biết liệu đã đủ thời gian để kỳ tiếp theo có thể xảy ra "
-        "(ngày thu kỳ k + 30 ngày ≤ hôm nay). Chỉ những dòng đủ thành thục mới có tỉ lệ duy trì đáng tin cậy."
-    )
 
     # ── Filters ──────────────────────────────────────────────────────────────
     df_filtered = df_date[df_date["san_pham"].isin(products)].copy()
@@ -899,14 +893,14 @@ def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> No
     df_show["ngay_tra_ky_k"] = df_show["ngay_tra_ky_k"].dt.strftime("%d/%m/%Y")
     df_show = df_show.rename(columns={
         "san_pham": "Sản phẩm",
-        "ngay_tra_ky_k": "Ngày thu kỳ k",
-        "ky": "Kỳ",
-        "so_gcn": "Số HĐ kỳ k",
-        "da_tra_ky_tiep": "Đã trả kỳ tiếp",
-        "chua_tra_ky_tiep": "Chưa trả kỳ tiếp",
-        "ty_le_giu_chan_pct": "Duy trì đóng phí (%)",
+        "ngay_tra_ky_k": "Ngày thu phí",
+        "ky": "Kỳ thu phí",
+        "so_gcn": "Số GCN đã thu phí",
+        "da_tra_ky_tiep": "Đã thu phí kỳ tiếp theo",
+        "chua_tra_ky_tiep": "Chưa thu phí kỳ tiếp theo",
+        "ty_le_giu_chan_pct": "Duy trì thu phí",
         "is_mature": "Đã quá 30 ngày",
-    }).sort_values(["Sản phẩm", "Ngày thu kỳ k", "Kỳ"])
+    }).sort_values(["Sản phẩm", "Ngày thu phí", "Kỳ thu phí"])
 
     st.dataframe(
         df_show,
@@ -917,43 +911,43 @@ def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> No
                 "Sản phẩm",
                 help="Tên sản phẩm bảo hiểm.",
             ),
-            "Ngày thu kỳ k": st.column_config.TextColumn(
-                "Ngày thu kỳ k",
-                help="Ngày khách hàng thanh toán kỳ phí thứ k (Trạng thái đối soát = Thành công).",
+            "Ngày thu phí": st.column_config.TextColumn(
+                "Ngày thu phí",
+                help="Ngày thu phí kỳ k.",
             ),
-            "Kỳ": st.column_config.NumberColumn(
-                "Kỳ",
+            "Kỳ thu phí": st.column_config.NumberColumn(
+                "Kỳ thu phí",
                 help="Kỳ phí đã được thanh toán (kỳ 2 đến kỳ 11; kỳ 1 miễn phí không theo dõi).",
                 format="%d",
             ),
-            "Số HĐ kỳ k": st.column_config.NumberColumn(
-                "Số HĐ kỳ k",
-                help="Số hợp đồng thanh toán kỳ k vào ngày này.",
+            "Số GCN đã thu phí": st.column_config.NumberColumn(
+                "Số GCN đã thu phí",
+                help="Số giấy chứng nhận thu phí kỳ k vào ngày này.",
                 format="%d",
             ),
-            "Đã trả kỳ tiếp": st.column_config.NumberColumn(
-                "Đã trả kỳ tiếp",
-                help="Trong số HĐ trả kỳ k, số HĐ đã tiếp tục trả kỳ k+1 (bất kể ngày nào).",
+            "Đã thu phí kỳ tiếp theo": st.column_config.NumberColumn(
+                "Đã thu phí kỳ tiếp theo",
+                help="Trong số GCN thu kỳ k, số GCN đã tiếp tục thu kỳ k+1 (bất kể ngày nào).",
                 format="%d",
             ),
-            "Chưa trả kỳ tiếp": st.column_config.NumberColumn(
-                "Chưa trả kỳ tiếp",
-                help="Trong số HĐ trả kỳ k, số HĐ chưa trả kỳ k+1 tính đến thời điểm truy vấn.",
+            "Chưa thu phí kỳ tiếp theo": st.column_config.NumberColumn(
+                "Chưa thu phí kỳ tiếp theo",
+                help="Trong số GCN thu kỳ k, số GCN chưa thu kỳ k+1 tính đến thời điểm truy vấn.",
                 format="%d",
             ),
-            "Duy trì đóng phí (%)": st.column_config.NumberColumn(
-                "Duy trì đóng phí (%)",
+            "Duy trì thu phí": st.column_config.NumberColumn(
+                "Duy trì thu phí",
                 help=(
-                    "Tỉ lệ HĐ trả kỳ k tiếp tục trả kỳ k+1 (%).\n\n"
+                    "Tỉ lệ GCN thu kỳ k tiếp tục thu kỳ k+1 (%).\n\n"
                     "Chỉ đáng tin cậy khi cột 'Đã quá 30 ngày' = ✓ "
-                    "(tức là ngày thu kỳ k + 30 ngày ≤ hôm nay, kỳ k+1 đã có đủ thời gian xảy ra)."
+                    "(tức là ngày thu phí + 30 ngày ≤ hôm nay, kỳ k+1 đã có đủ thời gian xảy ra)."
                 ),
                 format="%.1f",
             ),
             "Đã quá 30 ngày": st.column_config.CheckboxColumn(
                 "Đã quá 30 ngày",
                 help=(
-                    "TRUE khi ngày thu kỳ k + 30 ngày ≤ hôm nay, tức là kỳ k+1 "
+                    "TRUE khi ngày thu phí + 30 ngày ≤ hôm nay, tức là kỳ k+1 "
                     "đã có đủ thời gian để xảy ra. "
                     "Các dòng chưa đủ 30 ngày có tỉ lệ duy trì bị bias thấp do dữ liệu chưa đầy đủ."
                 ),
