@@ -93,6 +93,9 @@ def render_overview_page():
     delta_kh     = kh_hien_huu - kh_prev
 
     # Rate metric: delta = cumulative rate up to last_date vs cumulative rate up to prev_date
+    tong_tai_tuc_dk = df["Số đơn tái tục dự kiến"].sum()
+    ty_le_tai_tuc = tong_tai_tuc / tong_tai_tuc_dk if tong_tai_tuc_dk > 0 else 0.0
+
     if prev_date is not None:
         cum_last    = df[df["Ngày phát sinh"] <= last_date]
         cum_prev    = df[df["Ngày phát sinh"] <= prev_date]
@@ -101,8 +104,15 @@ def render_overview_page():
         prev_denom  = cum_prev["Số đơn cấp mới"].sum() + cum_prev["Số đơn cấp tái tục"].sum()
         prev_ty_le  = cum_prev["Số đơn hủy webview"].sum() / prev_denom if prev_denom > 0 else 0
         delta_ty_le = last_ty_le - prev_ty_le
+
+        last_ttdk   = cum_last["Số đơn tái tục dự kiến"].sum()
+        last_tt_rate  = cum_last["Số đơn cấp tái tục"].sum() / last_ttdk if last_ttdk > 0 else 0.0
+        prev_ttdk   = cum_prev["Số đơn tái tục dự kiến"].sum()
+        prev_tt_rate  = cum_prev["Số đơn cấp tái tục"].sum() / prev_ttdk if prev_ttdk > 0 else 0.0
+        delta_tai_tuc_rate = last_tt_rate - prev_tt_rate
     else:
         delta_ty_le = 0.0
+        delta_tai_tuc_rate = 0.0
 
     # ── Product breakdown for scorecard tooltips ──────────────────────────────
     def _grp(s: pd.Series) -> pd.Series:
@@ -155,13 +165,13 @@ def render_overview_page():
         ), unsafe_allow_html=True)
 
     with cols[2]:
+        _tt_color = "#2e7d32" if delta_tai_tuc_rate >= 0 else "#c62828"
         st.markdown(kpi_card(
-            label="Tổng số đơn tái tục",
-            value=f"{tong_tai_tuc:,}",
-            delta_str=f"+{delta_tai_tuc:,}",
-            delta_color="#2e7d32",
+            label="Tỷ lệ tái tục so với dự kiến",
+            value=f"{ty_le_tai_tuc:.1%}",
+            delta_str=f"{delta_tai_tuc_rate:+.2%}",
+            delta_color=_tt_color,
             accent_color="#2C7B6F",
-            yoy_html=yoy_caption(tong_tai_tuc, yoy_tai_tuc, lambda v: f"{int(v):,}", prev_year),
         ), unsafe_allow_html=True)
 
     with cols[3]:
