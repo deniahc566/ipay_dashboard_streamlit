@@ -50,6 +50,7 @@ def _scorecard_metrics(
     df_month: pd.DataFrame,
     df_date: pd.DataFrame,
     df_health: pd.DataFrame,
+    df_retention: pd.DataFrame,
     products: list[str],
 ) -> dict:
     """Tính toán các chỉ số tổng hợp cho scorecard."""
@@ -78,39 +79,26 @@ def _scorecard_metrics(
         if r_new is not None and r_prev is not None:
             ty_le_delta = r_new - r_prev
 
-    cutoff_month = (pd.Timestamp.now() - pd.DateOffset(months=1)).to_period("M").to_timestamp()
-
-    # Kỳ có retention thấp nhất (drop-off point)
-    fm_all = df_month[
-        df_month["san_pham"].isin(products)
-        & (df_month["thang_tra_ky_k"] < cutoff_month)
-        & df_month["ky"].between(2, 11)
+    # KPI 4 & 5 — Kỳ tốt nhất / dễ nghỉ nhất: dùng payment_retention_by_ky_thu
+    fr = df_retention[
+        df_retention["san_pham"].isin(products)
+        & df_retention["ky"].between(2, 11)
     ]
     dropoff_ky = None
+    dropoff_val = None
     best_ky = None
     best_ky_ret = None
-    best_ky_delta = None
-    if not fm_all.empty:
-        avg_by_ky = fm_all.groupby("ky")["ty_le_giu_chan_pct"].mean()
-        if not avg_by_ky.empty:
-            dropoff_ky = int(avg_by_ky.idxmin())
-            dropoff_val = avg_by_ky.min()
-            best_ky = int(avg_by_ky.idxmax())
-            best_ky_ret = float(avg_by_ky.max())
-            fm_best = fm_all[fm_all["ky"] == best_ky]
-            months_best = sorted(fm_best["thang_tra_ky_k"].unique())
-            if len(months_best) >= 2:
-                r_new = fm_best[fm_best["thang_tra_ky_k"] == months_best[-1]]["ty_le_giu_chan_pct"].mean()
-                r_prev = fm_best[fm_best["thang_tra_ky_k"] == months_best[-2]]["ty_le_giu_chan_pct"].mean()
-                if pd.notna(r_new) and pd.notna(r_prev):
-                    best_ky_delta = float(r_new - r_prev)
-        else:
-            dropoff_val = None
-    else:
-        dropoff_val = None
+    if not fr.empty:
+        by_ky = fr.groupby("ky")[["da_tra_k1", "so_gcn"]].sum()
+        by_ky = by_ky[by_ky["so_gcn"] > 0]
+        if not by_ky.empty:
+            by_ky["retention_pct"] = by_ky["da_tra_k1"] / by_ky["so_gcn"] * 100
+            dropoff_ky = int(by_ky["retention_pct"].idxmin())
+            dropoff_val = float(by_ky["retention_pct"].min())
+            best_ky = int(by_ky["retention_pct"].idxmax())
+            best_ky_ret = float(by_ky["retention_pct"].max())
 
-    # Avg retention tổng kỳ 2–11 (mature)
-    ret_overall = fm_all["ty_le_giu_chan_pct"].mean() if not fm_all.empty else None
+    ret_overall = None
 
     # Q2 — Sức khỏe danh mục: distinct GCN đang đóng phí / GCN có hiệu lực
     # Dùng tháng mới nhất có đủ cả distinct_gcn lẫn hieu_luc cho các sản phẩm đang chọn
@@ -150,7 +138,7 @@ def _scorecard_metrics(
     return dict(
         da_thu=int(da_thu), qua_han=int(qua_han), tong=int(tong),
         ty_le=ty_le, ty_le_delta=ty_le_delta,
-        best_ky=best_ky, best_ky_ret=best_ky_ret, best_ky_delta=best_ky_delta,
+        best_ky=best_ky, best_ky_ret=best_ky_ret,
         ret_overall=ret_overall,
         dropoff_ky=dropoff_ky, dropoff_val=dropoff_val,
         active_gcn=active_gcn, active_hieu_luc=active_hieu_luc,
@@ -165,9 +153,10 @@ def _render_scorecard(
     df_month: pd.DataFrame,
     df_date: pd.DataFrame,
     df_health: pd.DataFrame,
+    df_retention: pd.DataFrame,
     products: list[str],
 ) -> None:
-    m = _scorecard_metrics(df_ky, df_month, df_date, df_health, products)
+    m = _scorecard_metrics(df_ky, df_month, df_date, df_health, df_retention, products)
 
     # ── Row 1: 5 KPI cards ────────────────────────────────────────────────────
     c1, c2, c3, c4, c5 = st.columns(5)
@@ -959,7 +948,7 @@ def render_payment_retention_page():
     st.divider()
 
     # ── Scorecard ─────────────────────────────────────────────────────────────
-    _render_scorecard(df_ky, df_month, df_date, df_health, selected_products)
+    _render_scorecard(df_ky, df_month, df_date, df_health, df_retention, selected_products)
 
     st.divider()
 
