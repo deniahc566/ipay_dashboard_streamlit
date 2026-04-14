@@ -692,18 +692,19 @@ def _render_retention_curve(df_ky: pd.DataFrame, df_month: pd.DataFrame, product
             )
         )
 
-        # Label % còn lại phía trên cột
+        # Label con_lai: giữa cột xanh
         labels = (
             alt.Chart(wf_df)
-            .mark_text(dy=-8, fontSize=11, fontWeight="bold", color="#155724")
+            .mark_text(fontSize=11, fontWeight="bold", color="white")
             .encode(
                 x=alt.X("ky_label:N", sort=ky_order),
-                y=alt.Y("con_lai:Q"),
+                y=alt.Y("y_mid:Q"),
                 text=alt.Text("con_lai:Q", format=".1f"),
             )
+            .transform_calculate(y_mid="datum.con_lai / 2")
         )
 
-        # Label % mất (nhỏ hơn, màu trắng) bên trong cột xanh, gần đỉnh
+        # Label mat: giữa cột đỏ
         labels_lost = (
             alt.Chart(wf_lost)
             .mark_text(fontSize=9, color="white", fontWeight="bold")
@@ -712,7 +713,7 @@ def _render_retention_curve(df_ky: pd.DataFrame, df_month: pd.DataFrame, product
                 y=alt.Y("y_mid:Q"),
                 text=alt.Text("mat:Q", format=".1f"),
             )
-            .transform_calculate(y_mid="datum.con_lai * 0.88")
+            .transform_calculate(y_mid="(datum.con_lai + datum.prev) / 2")
         )
 
         chart = (bar_remain + bar_lost + labels + labels_lost).properties(title=sp, height=300)
