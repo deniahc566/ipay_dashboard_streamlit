@@ -349,11 +349,6 @@ def _render_scorecard(
 # ── Tab Q1: Hiệu quả thu trong kỳ ────────────────────────────────────────────
 
 def _render_q1_tab(df_ky: pd.DataFrame, products: list[str]) -> None:
-    st.markdown(
-        "**Câu hỏi:** Trong số hợp đồng đã đến hạn phải trả, bao nhiêu % thực sự đã trả?\n\n"
-        "_Chỉ tính từ kỳ 2 trở đi — kỳ 1 luôn đạt 100% vì tất cả HĐ mới đều bắt đầu từ đây._"
-    )
-
     import numpy as np
 
     df = df_ky[df_ky["san_pham"].isin(products) & (df_ky["ky"] >= 2)].copy()
@@ -442,12 +437,6 @@ def _render_q1_tab(df_ky: pd.DataFrame, products: list[str]) -> None:
 # ── Tab Q2: Sức khỏe danh mục ────────────────────────────────────────────────
 
 def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
-    st.markdown(
-        "**Câu hỏi:** Trong toàn bộ hợp đồng đang có hiệu lực, "
-        "bao nhiêu % đang thực sự đóng phí?\n\n"
-        "_Tử số: số HĐ unique đã trả ≥1 kỳ trong tháng. "
-        "Mẫu số: số HĐ đang có hiệu lực cuối tháng._"
-    )
 
     df = df_health[
         df_health["san_pham"].isin(products)
@@ -467,39 +456,40 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
     st.markdown("##### Tỷ lệ thu phí theo tháng thu phí")
     st.caption("% HĐ đang đóng phí / HĐ có hiệu lực theo từng tháng và sản phẩm.")
 
-    trend = (
+    _color_enc = alt.Color(
+        "san_pham:N",
+        title="Sản phẩm",
+        scale=alt.Scale(
+            domain=list(_PRODUCT_COLORS.keys()),
+            range=list(_PRODUCT_COLORS.values()),
+        ),
+        legend=None,
+    )
+    _x_enc = alt.X("thang:T", timeUnit="yearmonth",
+                   axis=alt.Axis(format="%m/%Y", labelAngle=-45, title=None))
+    _y_enc = alt.Y("ty_le_pct:Q", title="% HĐ đang đóng phí", scale=alt.Scale(zero=False))
+    _tooltip = [
+        alt.Tooltip("thang_str:N", title="Tháng"),
+        alt.Tooltip("ty_le_pct:Q", title="% đang đóng phí", format=".1f"),
+        alt.Tooltip("gcn_fmt:N", title="HĐ đang đóng phí"),
+        alt.Tooltip("hl_fmt:N", title="HĐ có hiệu lực"),
+    ]
+
+    line = (
         alt.Chart(df)
-        .mark_bar()
-        .encode(
-            x=alt.X("thang:T",
-                    timeUnit="yearmonth",
-                    axis=alt.Axis(format="%m/%Y", labelAngle=-45, title=None)),
-            y=alt.Y(
-                "ty_le_pct:Q",
-                title="% HĐ đang đóng phí",
-                scale=alt.Scale(zero=False),
-            ),
-            color=alt.Color(
-                "san_pham:N",
-                title="Sản phẩm",
-                scale=alt.Scale(
-                    domain=list(_PRODUCT_COLORS.keys()),
-                    range=list(_PRODUCT_COLORS.values()),
-                ),
-                legend=None,
-            ),
-            tooltip=[
-                alt.Tooltip("thang_str:N", title="Tháng"),
-                alt.Tooltip("ty_le_pct:Q", title="% đang đóng phí", format=".1f"),
-                alt.Tooltip("gcn_fmt:N", title="HĐ đang đóng phí"),
-                alt.Tooltip("hl_fmt:N", title="HĐ có hiệu lực"),
-            ],
-        )
-        .properties(height=180)
-        .facet(
-            facet=alt.Facet("san_pham:N", title=None),
-            columns=2,
-        )
+        .mark_line(point=True, strokeWidth=2)
+        .encode(x=_x_enc, y=_y_enc, color=_color_enc, tooltip=_tooltip)
+    )
+    text_labels = (
+        alt.Chart(df)
+        .mark_text(dy=-10, fontSize=9, fontWeight="bold")
+        .encode(x=_x_enc, y=_y_enc, color=_color_enc,
+                text=alt.Text("ty_le_pct:Q", format=".1f"))
+    )
+    trend = (
+        alt.layer(line, text_labels)
+        .properties(height=200)
+        .facet(facet=alt.Facet("san_pham:N", title=None), columns=2)
         .resolve_scale(y="independent")
     )
     st.altair_chart(trend, use_container_width=True)
@@ -773,7 +763,29 @@ def _render_payment_date_table(df_date: pd.DataFrame, df_month: pd.DataFrame, pr
                 )
                 .properties(height=280)
             )
-            st.altair_chart(bar_m, use_container_width=True)
+            # Data labels: green segment (da_thu) ở giữa, red segment (chua_thu) ở trên
+            lbl_green = (
+                alt.Chart(agg_m[agg_m["da_thu"] > 0])
+                .mark_text(color="white", fontWeight="bold", fontSize=9, baseline="middle")
+                .encode(
+                    x=alt.X("thang_tra_ky_k:T", timeUnit="yearmonth"),
+                    y=alt.Y("y_green:Q"),
+                    text=alt.Text("da_thu:Q", format=",d"),
+                )
+                .transform_calculate(y_green="datum.da_thu / 2")
+            )
+            agg_m_red = agg_m[agg_m["chua_thu"] > 0]
+            lbl_red = (
+                alt.Chart(agg_m_red)
+                .mark_text(color="white", fontWeight="bold", fontSize=9, baseline="middle")
+                .encode(
+                    x=alt.X("thang_tra_ky_k:T", timeUnit="yearmonth"),
+                    y=alt.Y("y_red:Q"),
+                    text=alt.Text("chua_thu:Q", format=",d"),
+                )
+                .transform_calculate(y_red="datum.da_thu + datum.chua_thu / 2")
+            )
+            st.altair_chart((bar_m + lbl_green + lbl_red), use_container_width=True)
 
     st.divider()
 
