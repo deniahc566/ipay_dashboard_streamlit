@@ -76,7 +76,7 @@ def render_complaints_page():
     with col_refresh:
         if st.button(
             "⟳ Làm mới",
-            use_container_width=True,
+            width="stretch",
             help="Xóa cache và tải lại dữ liệu mới nhất từ MotherDuck",
         ):
             load_complaints_data.clear()
@@ -220,7 +220,7 @@ def render_complaints_page():
                 lambda v: "font-weight:700" if isinstance(v, (int, float)) else "",
                 subset=["Tổng"],
             )
-            st.dataframe(styled_y, use_container_width=True)
+            st.dataframe(styled_y, width="stretch")
         elif df_yesterday.empty:
             st.info(f"Không có khiếu nại nào vào ngày {yesterday.strftime('%d/%m/%Y')}.")
         else:
@@ -240,7 +240,7 @@ def render_complaints_page():
         )
         if has_priority_col and not df.empty:
             pri_count = df.groupby("priority").size().reset_index(name="count").sort_values("count", ascending=False)
-            st.altair_chart(_bar_with_label(pri_count, "priority", "count", height=220), use_container_width=True)
+            st.altair_chart(_bar_with_label(pri_count, "priority", "count", height=220), width="stretch")
         else:
             st.info("Không có dữ liệu mức độ ưu tiên.")
 
@@ -268,7 +268,7 @@ def render_complaints_page():
         lbl1 = bar1.mark_text(align="center", dy=-6, fontSize=11, fontWeight="normal", clip=False).encode(
             text=alt.Text("avg:Q", format=".2f")
         )
-        st.altair_chart(bar1 + lbl1, use_container_width=True)
+        st.altair_chart(bar1 + lbl1, width="stretch")
 
     with r1c2:
         st.markdown(
@@ -276,7 +276,7 @@ def render_complaints_page():
             "Số khiếu nại theo sản phẩm</p>", unsafe_allow_html=True,
         )
         prod_count = df.groupby("products").size().reset_index(name="count").sort_values("count", ascending=False)
-        st.altair_chart(_bar_with_label(prod_count, "products", "count", height=220), use_container_width=True)
+        st.altair_chart(_bar_with_label(prod_count, "products", "count", height=220), width="stretch")
 
     with r1c3:
         st.markdown(
@@ -284,7 +284,7 @@ def render_complaints_page():
             "Số khiếu nại theo loại khiếu nại</p>", unsafe_allow_html=True,
         )
         type_count = df.groupby("complaint_types").size().reset_index(name="count").sort_values("count", ascending=False)
-        st.altair_chart(_bar_with_label(type_count, "complaint_types", "count", height=220), use_container_width=True)
+        st.altair_chart(_bar_with_label(type_count, "complaint_types", "count", height=220), width="stretch")
 
     # ── Row 2: horizontal bar + line chart (monthly, last 12 months) ─────────
     r2c1, r2c2 = st.columns(2)
@@ -311,7 +311,7 @@ def render_complaints_page():
         h_label = h_bar.mark_text(align="left", dx=4, fontSize=11, clip=False).encode(
             text=alt.Text("count:Q", format=",")
         )
-        st.altair_chart(h_bar + h_label, use_container_width=True)
+        st.altair_chart(h_bar + h_label, width="stretch")
 
     with r2c2:
         st.markdown(
@@ -338,7 +338,7 @@ def render_complaints_page():
         lbl_line = line.mark_text(align="center", dy=-12, fontSize=10, fontWeight="normal").encode(
             text=alt.Text("Số KN:Q", format=",")
         )
-        st.altair_chart(line + lbl_line, use_container_width=True)
+        st.altair_chart(line + lbl_line, width="stretch")
 
 
     # ── Detail table with hover tooltip ──────────────────────────────────────
@@ -426,11 +426,11 @@ def render_complaints_page():
     # ── Pagination controls ───────────────────────────────────────────────────
     pc_first, pc_prev, pc_mid, pc_next, pc_last = st.columns([1, 1, 3, 1, 1])
     with pc_first:
-        if st.button("⏮ Đầu", disabled=current_page <= 1, key="kn_first", use_container_width=True):
+        if st.button("⏮ Đầu", disabled=current_page <= 1, key="kn_first", width="stretch"):
             st.session_state["kn_page"] = 1
             st.rerun()
     with pc_prev:
-        if st.button("← Trước", disabled=current_page <= 1, key="kn_prev", use_container_width=True):
+        if st.button("← Trước", disabled=current_page <= 1, key="kn_prev", width="stretch"):
             st.session_state["kn_page"] = current_page - 1
             st.rerun()
     with pc_mid:
@@ -440,10 +440,10 @@ def render_complaints_page():
             unsafe_allow_html=True,
         )
     with pc_next:
-        if st.button("Tiếp →", disabled=current_page >= total_pages, key="kn_next", use_container_width=True):
+        if st.button("Tiếp →", disabled=current_page >= total_pages, key="kn_next", width="stretch"):
             st.session_state["kn_page"] = current_page + 1
             st.rerun()
     with pc_last:
-        if st.button("Cuối ⏭", disabled=current_page >= total_pages, key="kn_last", use_container_width=True):
+        if st.button("Cuối ⏭", disabled=current_page >= total_pages, key="kn_last", width="stretch"):
             st.session_state["kn_page"] = total_pages
             st.rerun()

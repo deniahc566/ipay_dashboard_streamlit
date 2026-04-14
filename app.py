@@ -242,40 +242,40 @@ with st.sidebar:
 
     # ── Top-level nav item ────────────────────────────────────────────────────
     if st.button("Tổng quan hàng ngày", key="nav_overview",
-                 use_container_width=True):
+                 width="stretch"):
         st.session_state.page = "Tổng quan"
         st.rerun()
 
     # ── Collapsible section header ────────────────────────────────────────────
     arrow = "▾" if st.session_state.vhct_open else "▸"
     if st.button(f"Báo cáo chi tiết {arrow}", key="nav_vhct",
-                 use_container_width=True):
+                 width="stretch"):
         st.session_state.vhct_open = not st.session_state.vhct_open
         st.rerun()
 
     # ── Sub-items (shown when section is expanded) ────────────────────────────
     if st.session_state.vhct_open:
-        if st.button("Cyber Risk", key="nav_cyber", use_container_width=True):
+        if st.button("Cyber Risk", key="nav_cyber", width="stretch"):
             st.session_state.page = "Cyber Risk"
             st.rerun()
-        if st.button("I-Safe", key="nav_isafe", use_container_width=True):
+        if st.button("I-Safe", key="nav_isafe", width="stretch"):
             st.session_state.page = "I-Safe"
             st.rerun()
-        if st.button("TapCare", key="nav_tapcare", use_container_width=True):
+        if st.button("TapCare", key="nav_tapcare", width="stretch"):
             st.session_state.page = "TapCare"
             st.rerun()
-        if st.button("Nhà và bạn", key="nav_homesaving", use_container_width=True):
+        if st.button("Nhà và bạn", key="nav_homesaving", width="stretch"):
             st.session_state.page = "Nhà và bạn"
             st.rerun()
-        if st.button("Sản phẩm khác", key="nav_other", use_container_width=True):
+        if st.button("Sản phẩm khác", key="nav_other", width="stretch"):
             st.session_state.page = "Sản phẩm khác"
             st.rerun()
 
-    if st.button("Thu phí & Retention", key="nav_retention", use_container_width=True):
+    if st.button("Thu phí & Retention", key="nav_retention", width="stretch"):
         st.session_state.page = "Thu phí & Retention"
         st.rerun()
 
-    if st.button("Báo cáo CSKH", key="nav_complaints", use_container_width=True):
+    if st.button("Báo cáo CSKH", key="nav_complaints", width="stretch"):
         st.session_state.page = "Khiếu nại"
         st.rerun()
 

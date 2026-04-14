@@ -342,7 +342,7 @@ def _render_scorecard(
         if rows:
             st.dataframe(
                 pd.DataFrame(rows).set_index("Sản phẩm"),
-                use_container_width=True,
+                width="stretch",
             )
 
 
@@ -430,7 +430,7 @@ def _render_q1_tab(df_ky: pd.DataFrame, products: list[str]) -> None:
                 )
                 .properties(height=max(200, len(sp_df["ky"].unique()) * 30 + 60))
             )
-            st.altair_chart(hm_chart, use_container_width=True)
+            st.altair_chart(hm_chart, width="stretch")
 
 
 
@@ -493,7 +493,7 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
         .facet(facet=alt.Facet("san_pham:N", title=None), columns=min(n_sp, 2))
         .resolve_scale(y="independent")
     )
-    st.altair_chart(trend, use_container_width=True)
+    st.altair_chart(trend, width="stretch")
 
 
 
@@ -595,7 +595,7 @@ def _render_retention_curve(df_retention: pd.DataFrame, products: list[str], min
 
         chart = (bar_remain + bar_lost + labels + labels_lost).properties(title=sp, height=300)
         with cols[i % 2]:
-            st.altair_chart(chart, use_container_width=True)
+            st.altair_chart(chart, width="stretch")
 
 
 # ── Chart 3: Day-of-Month Heatmap ────────────────────────────────────────────
@@ -672,67 +672,99 @@ def _render_payment_date_table(df_date: pd.DataFrame, df_month: pd.DataFrame, pr
     ky_label = f"Kỳ {ky_lo}–{ky_hi}" if ky_lo != ky_hi else f"Kỳ {ky_lo}"
 
     # ── Biểu đồ ─────────────────────────────────────────────────────────────
-    # Stacked bar — Số GCN đã/chưa thu kỳ tiếp (theo ngày)
-    st.markdown(f"##### Số GCN theo ngày — {ky_label}")
-    agg = (
-        df_chart.groupby("ngay")
-        .agg(da_thu=("da_tra_ky_tiep", "sum"), chua_thu=("chua_tra_ky_tiep", "sum"))
-        .reset_index()
-    )
-    melted = agg.melt(
-        id_vars=["ngay"],
-        value_vars=["da_thu", "chua_thu"],
-        var_name="trang_thai",
-        value_name="so_gcn",
-    )
-    melted["trang_thai"] = melted["trang_thai"].map(
-        {"da_thu": "Đã thu kỳ tiếp", "chua_thu": "Chưa thu kỳ tiếp"}
-    )
-    bar = (
-        alt.Chart(melted)
-        .mark_bar()
-        .encode(
-            x=alt.X("ngay:O", title="Ngày", axis=alt.Axis(labelAngle=0)),
-            y=alt.Y("so_gcn:Q", title="Số GCN", stack="zero"),
-            color=alt.Color(
-                "trang_thai:N",
-                title="Trạng thái",
-                scale=alt.Scale(
-                    domain=["Đã thu kỳ tiếp", "Chưa thu kỳ tiếp"],
-                    range=["#2ca02c", "#d62728"],
+    col_ngay, col_thang = st.columns(2)
+
+    # Chart 1: Stacked bar — Số GCN theo ngày
+    with col_ngay:
+        st.markdown(f"##### Số GCN theo ngày — {ky_label}")
+        agg = (
+            df_chart.groupby("ngay")
+            .agg(da_thu=("da_tra_ky_tiep", "sum"), chua_thu=("chua_tra_ky_tiep", "sum"))
+            .reset_index()
+        )
+        melted = agg.melt(
+            id_vars=["ngay"],
+            value_vars=["da_thu", "chua_thu"],
+            var_name="trang_thai",
+            value_name="so_gcn",
+        )
+        melted["trang_thai"] = melted["trang_thai"].map(
+            {"da_thu": "Đã thu kỳ tiếp", "chua_thu": "Chưa thu kỳ tiếp"}
+        )
+        bar = (
+            alt.Chart(melted)
+            .mark_bar()
+            .encode(
+                x=alt.X("ngay:O", title="Ngày", axis=alt.Axis(labelAngle=0)),
+                y=alt.Y("so_gcn:Q", title="Số GCN", stack="zero"),
+                color=alt.Color(
+                    "trang_thai:N",
+                    title="Trạng thái",
+                    scale=alt.Scale(
+                        domain=["Đã thu kỳ tiếp", "Chưa thu kỳ tiếp"],
+                        range=["#2ca02c", "#d62728"],
+                    ),
+                    legend=alt.Legend(orient="bottom"),
                 ),
-                legend=alt.Legend(orient="bottom"),
-            ),
-            tooltip=[
-                alt.Tooltip("ngay:O", title="Ngày"),
-                alt.Tooltip("trang_thai:N", title="Trạng thái"),
-                alt.Tooltip("so_gcn:Q", title="Số GCN", format=",d"),
-            ],
+                tooltip=[
+                    alt.Tooltip("ngay:O", title="Ngày"),
+                    alt.Tooltip("trang_thai:N", title="Trạng thái"),
+                    alt.Tooltip("so_gcn:Q", title="Số GCN", format=",d"),
+                ],
+            )
+            .properties(height=280)
         )
-        .properties(height=280)
-    )
-    # Data labels cho phần xanh và phần đỏ
-    lbl_g = (
-        alt.Chart(agg[agg["da_thu"] > 0])
-        .mark_text(color="white", fontWeight="bold", fontSize=9, baseline="middle")
-        .encode(
-            x=alt.X("ngay:O"),
-            y=alt.Y("y_g:Q"),
-            text=alt.Text("da_thu:Q", format=",d"),
-        )
-        .transform_calculate(y_g="datum.da_thu / 2")
-    )
-    lbl_r = (
-        alt.Chart(agg[agg["chua_thu"] > 0])
-        .mark_text(color="white", fontWeight="bold", fontSize=9, baseline="middle")
-        .encode(
-            x=alt.X("ngay:O"),
-            y=alt.Y("y_r:Q"),
-            text=alt.Text("chua_thu:Q", format=",d"),
-        )
-        .transform_calculate(y_r="datum.da_thu + datum.chua_thu / 2")
-    )
-    st.altair_chart((bar + lbl_g + lbl_r), use_container_width=True)
+        st.altair_chart(bar, width="stretch")
+
+    # Chart 2: Stacked bar — Số GCN theo tháng
+    with col_thang:
+        st.markdown(f"##### Số GCN theo tháng — {ky_label}")
+        df_month_chart = df_month[
+            df_month["san_pham"].isin(products)
+            & df_month["ky"].between(ky_lo, ky_hi)
+        ].copy()
+        if not df_month_chart.empty:
+            agg_m = (
+                df_month_chart.groupby("thang_tra_ky_k")
+                .agg(da_thu=("da_tra_ky_tiep", "sum"), chua_thu=("chua_tra_ky_tiep", "sum"))
+                .reset_index()
+            )
+            agg_m["thang_str"] = agg_m["thang_tra_ky_k"].dt.strftime("%m/%Y")
+            melted_m = agg_m.melt(
+                id_vars=["thang_tra_ky_k", "thang_str"],
+                value_vars=["da_thu", "chua_thu"],
+                var_name="trang_thai",
+                value_name="so_gcn",
+            )
+            melted_m["trang_thai"] = melted_m["trang_thai"].map(
+                {"da_thu": "Đã thu kỳ tiếp", "chua_thu": "Chưa thu kỳ tiếp"}
+            )
+            bar_m = (
+                alt.Chart(melted_m)
+                .mark_bar()
+                .encode(
+                    x=alt.X("thang_tra_ky_k:T",
+                            timeUnit="yearmonth",
+                            axis=alt.Axis(format="%m/%Y", labelAngle=-45, title=None)),
+                    y=alt.Y("so_gcn:Q", title="Số GCN", stack="zero"),
+                    color=alt.Color(
+                        "trang_thai:N",
+                        title="Trạng thái",
+                        scale=alt.Scale(
+                            domain=["Đã thu kỳ tiếp", "Chưa thu kỳ tiếp"],
+                            range=["#2ca02c", "#d62728"],
+                        ),
+                        legend=alt.Legend(orient="bottom"),
+                    ),
+                    tooltip=[
+                        alt.Tooltip("thang_str:N", title="Tháng"),
+                        alt.Tooltip("trang_thai:N", title="Trạng thái"),
+                        alt.Tooltip("so_gcn:Q", title="Số GCN", format=",d"),
+                    ],
+                )
+                .properties(height=280)
+            )
+            st.altair_chart(bar_m, width="stretch")
 
     st.divider()
 
@@ -770,7 +802,7 @@ def _render_payment_date_table(df_date: pd.DataFrame, df_month: pd.DataFrame, pr
 
     st.dataframe(
         df_show,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         column_config={
             "Sản phẩm": st.column_config.TextColumn(
@@ -835,7 +867,7 @@ def render_payment_retention_page():
     with col_refresh:
         if st.button(
             "⟳ Làm mới",
-            use_container_width=True,
+            width="stretch",
             help="Xóa cache và tải lại dữ liệu mới nhất từ MotherDuck",
         ):
             load_all_payment_tracking.clear()
