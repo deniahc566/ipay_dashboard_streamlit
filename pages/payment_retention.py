@@ -688,11 +688,8 @@ def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> No
     ky_label = f"Kỳ {ky_lo}–{ky_hi}" if ky_lo != ky_hi else f"Kỳ {ky_lo}"
 
     # ── Biểu đồ ─────────────────────────────────────────────────────────────
-    col_left, col_right = st.columns(2)
-
     # Chart 1: Stacked bar — Số GCN đã/chưa thu kỳ tiếp
-    with col_left:
-        st.markdown(f"##### Số GCN theo ngày — {ky_label}")
+    st.markdown(f"##### Số GCN theo ngày — {ky_label}")
         agg = (
             df_chart.groupby("ngay")
             .agg(da_thu=("da_tra_ky_tiep", "sum"), chua_thu=("chua_tra_ky_tiep", "sum"))
@@ -731,53 +728,6 @@ def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> No
             .properties(height=280)
         )
         st.altair_chart(bar, use_container_width=True)
-
-    # Chart 2: Line — Tỉ lệ duy trì thu phí (chỉ is_mature)
-    with col_right:
-        st.markdown(f"##### Tỉ lệ duy trì thu phí — {ky_label}")
-        df_line = df_chart[df_chart["is_mature"]].copy()
-        if df_line.empty:
-            st.info("Chưa có ngày nào đã quá 30 ngày trong tháng này.")
-        else:
-            line_agg = (
-                df_line.groupby(["ngay", "san_pham"])
-                .agg(da_thu=("da_tra_ky_tiep", "sum"), so_gcn=("so_gcn", "sum"))
-                .reset_index()
-            )
-            line_agg["ty_le"] = (
-                line_agg["da_thu"]
-                / line_agg["so_gcn"].replace(0, float("nan"))
-                * 100
-            ).round(1)
-            line_chart = (
-                alt.Chart(line_agg)
-                .mark_line(point=True, strokeWidth=2)
-                .encode(
-                    x=alt.X("ngay:O", title="Ngày", axis=alt.Axis(labelAngle=0)),
-                    y=alt.Y(
-                        "ty_le:Q",
-                        title="Duy trì thu phí (%)",
-                        scale=alt.Scale(zero=False),
-                    ),
-                    color=alt.Color(
-                        "san_pham:N",
-                        title="Sản phẩm",
-                        scale=alt.Scale(
-                            domain=list(_PRODUCT_COLORS.keys()),
-                            range=list(_PRODUCT_COLORS.values()),
-                        ),
-                        legend=alt.Legend(orient="bottom"),
-                    ),
-                    tooltip=[
-                        alt.Tooltip("san_pham:N", title="Sản phẩm"),
-                        alt.Tooltip("ngay:O", title="Ngày"),
-                        alt.Tooltip("ty_le:Q", title="Duy trì thu phí (%)", format=".1f"),
-                        alt.Tooltip("so_gcn:Q", title="Số GCN", format=",d"),
-                    ],
-                )
-                .properties(height=280)
-            )
-            st.altair_chart(line_chart, use_container_width=True)
 
     st.divider()
 
