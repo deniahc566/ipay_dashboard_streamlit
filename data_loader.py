@@ -76,7 +76,8 @@ def load_all_payment_tracking() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFram
         df_ky = con.execute("SELECT * FROM silver.payment_tracking_by_ky").df()
 
         df_month = con.execute("""
-            SELECT san_pham, thang_tra_ky_k, ky, so_gcn, ty_le_giu_chan_pct
+            SELECT san_pham, thang_tra_ky_k, ky, so_gcn,
+                   da_tra_ky_tiep, chua_tra_ky_tiep, ty_le_giu_chan_pct
             FROM silver.payment_tracking_by_payment_month
         """).df()
 
