@@ -511,48 +511,6 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
     )
     st.altair_chart(trend, use_container_width=True)
 
-    # ── Chart 2: So sánh tháng gần nhất ──────────────────────────────────────
-    df_latest = df[df["thang"] == df["thang"].max()]
-
-    if not df_latest.empty:
-        latest_label = df_latest["thang_str"].iloc[0]
-        st.markdown(f"##### So sánh theo sản phẩm — tháng {latest_label}")
-
-        bar = (
-            alt.Chart(df_latest)
-            .mark_bar()
-            .encode(
-                x=alt.X(
-                    "san_pham:N",
-                    title="Sản phẩm",
-                    sort=alt.SortField("ty_le_pct", order="descending"),
-                ),
-                y=alt.Y(
-                    "ty_le_pct:Q",
-                    title="% HĐ đang đóng phí",
-                    scale=alt.Scale(zero=False),
-                ),
-                color=alt.Color(
-                    "san_pham:N",
-                    scale=alt.Scale(
-                        domain=list(_PRODUCT_COLORS.keys()),
-                        range=list(_PRODUCT_COLORS.values()),
-                    ),
-                    legend=None,
-                ),
-                tooltip=[
-                    alt.Tooltip("san_pham:N", title="Sản phẩm"),
-                    alt.Tooltip("ty_le_pct:Q", title="% đang đóng phí", format=".1f"),
-                    alt.Tooltip("gcn_fmt:N", title="HĐ đang đóng phí"),
-                    alt.Tooltip("hl_fmt:N", title="HĐ có hiệu lực"),
-                ],
-            )
-            .properties(height=280)
-        )
-        text = bar.mark_text(align="center", baseline="bottom", dy=-4).encode(
-            text=alt.Text("ty_le_pct:Q", format=".1f"),
-        )
-        st.altair_chart((bar + text), use_container_width=True)
 
 
 # ── Retention Curve ───────────────────────────────────────────────────────────
