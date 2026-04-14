@@ -688,76 +688,30 @@ def _render_payment_date_table(df_date: pd.DataFrame, df_month: pd.DataFrame, pr
     ky_label = f"Kỳ {ky_lo}–{ky_hi}" if ky_lo != ky_hi else f"Kỳ {ky_lo}"
 
     # ── Biểu đồ ─────────────────────────────────────────────────────────────
-    # Chart 1: Stacked bar — Số GCN đã/chưa thu kỳ tiếp
-    st.markdown(f"##### Số GCN theo ngày — {ky_label}")
-    agg = (
-        df_chart.groupby("ngay")
-        .agg(da_thu=("da_tra_ky_tiep", "sum"), chua_thu=("chua_tra_ky_tiep", "sum"))
-        .reset_index()
-    )
-    melted = agg.melt(
-        id_vars=["ngay"],
-        value_vars=["da_thu", "chua_thu"],
-        var_name="trang_thai",
-        value_name="so_gcn",
-    )
-    melted["trang_thai"] = melted["trang_thai"].map(
-        {"da_thu": "Đã thu kỳ tiếp", "chua_thu": "Chưa thu kỳ tiếp"}
-    )
-    bar = (
-        alt.Chart(melted)
-        .mark_bar()
-        .encode(
-            x=alt.X("ngay:O", title="Ngày", axis=alt.Axis(labelAngle=0)),
-            y=alt.Y("so_gcn:Q", title="Số GCN", stack="zero"),
-            color=alt.Color(
-                "trang_thai:N",
-                title="Trạng thái",
-                scale=alt.Scale(
-                    domain=["Đã thu kỳ tiếp", "Chưa thu kỳ tiếp"],
-                    range=["#2ca02c", "#d62728"],
-                ),
-                legend=alt.Legend(orient="bottom"),
-            ),
-            tooltip=[
-                alt.Tooltip("ngay:O", title="Ngày"),
-                alt.Tooltip("trang_thai:N", title="Trạng thái"),
-                alt.Tooltip("so_gcn:Q", title="Số GCN", format=",d"),
-            ],
-        )
-        .properties(height=280)
-    )
-    st.altair_chart(bar, use_container_width=True)
+    col_ngay, col_thang = st.columns(2)
 
-    # ── Chart 2: Stacked bar — Số GCN theo tháng ─────────────────────────────
-    st.markdown(f"##### Số GCN theo tháng — {ky_label}")
-    df_month_chart = df_month[
-        df_month["san_pham"].isin(products)
-        & df_month["ky"].between(ky_lo, ky_hi)
-    ].copy()
-    if not df_month_chart.empty:
-        agg_m = (
-            df_month_chart.groupby("thang_tra_ky_k")
+    # Chart 1: Stacked bar — Số GCN đã/chưa thu kỳ tiếp (theo ngày)
+    with col_ngay:
+        st.markdown(f"##### Số GCN theo ngày — {ky_label}")
+        agg = (
+            df_chart.groupby("ngay")
             .agg(da_thu=("da_tra_ky_tiep", "sum"), chua_thu=("chua_tra_ky_tiep", "sum"))
             .reset_index()
         )
-        agg_m["thang_str"] = agg_m["thang_tra_ky_k"].dt.strftime("%m/%Y")
-        melted_m = agg_m.melt(
-            id_vars=["thang_tra_ky_k", "thang_str"],
+        melted = agg.melt(
+            id_vars=["ngay"],
             value_vars=["da_thu", "chua_thu"],
             var_name="trang_thai",
             value_name="so_gcn",
         )
-        melted_m["trang_thai"] = melted_m["trang_thai"].map(
+        melted["trang_thai"] = melted["trang_thai"].map(
             {"da_thu": "Đã thu kỳ tiếp", "chua_thu": "Chưa thu kỳ tiếp"}
         )
-        bar_m = (
-            alt.Chart(melted_m)
+        bar = (
+            alt.Chart(melted)
             .mark_bar()
             .encode(
-                x=alt.X("thang_tra_ky_k:T",
-                        timeUnit="yearmonth",
-                        axis=alt.Axis(format="%m/%Y", labelAngle=-45, title=None)),
+                x=alt.X("ngay:O", title="Ngày", axis=alt.Axis(labelAngle=0)),
                 y=alt.Y("so_gcn:Q", title="Số GCN", stack="zero"),
                 color=alt.Color(
                     "trang_thai:N",
@@ -769,14 +723,64 @@ def _render_payment_date_table(df_date: pd.DataFrame, df_month: pd.DataFrame, pr
                     legend=alt.Legend(orient="bottom"),
                 ),
                 tooltip=[
-                    alt.Tooltip("thang_str:N", title="Tháng"),
+                    alt.Tooltip("ngay:O", title="Ngày"),
                     alt.Tooltip("trang_thai:N", title="Trạng thái"),
                     alt.Tooltip("so_gcn:Q", title="Số GCN", format=",d"),
                 ],
             )
             .properties(height=280)
         )
-        st.altair_chart(bar_m, use_container_width=True)
+        st.altair_chart(bar, use_container_width=True)
+
+    # ── Chart 2: Stacked bar — Số GCN theo tháng ─────────────────────────────
+    with col_thang:
+        st.markdown(f"##### Số GCN theo tháng — {ky_label}")
+        df_month_chart = df_month[
+            df_month["san_pham"].isin(products)
+            & df_month["ky"].between(ky_lo, ky_hi)
+        ].copy()
+        if not df_month_chart.empty:
+            agg_m = (
+                df_month_chart.groupby("thang_tra_ky_k")
+                .agg(da_thu=("da_tra_ky_tiep", "sum"), chua_thu=("chua_tra_ky_tiep", "sum"))
+                .reset_index()
+            )
+            agg_m["thang_str"] = agg_m["thang_tra_ky_k"].dt.strftime("%m/%Y")
+            melted_m = agg_m.melt(
+                id_vars=["thang_tra_ky_k", "thang_str"],
+                value_vars=["da_thu", "chua_thu"],
+                var_name="trang_thai",
+                value_name="so_gcn",
+            )
+            melted_m["trang_thai"] = melted_m["trang_thai"].map(
+                {"da_thu": "Đã thu kỳ tiếp", "chua_thu": "Chưa thu kỳ tiếp"}
+            )
+            bar_m = (
+                alt.Chart(melted_m)
+                .mark_bar()
+                .encode(
+                    x=alt.X("thang_tra_ky_k:T",
+                            timeUnit="yearmonth",
+                            axis=alt.Axis(format="%m/%Y", labelAngle=-45, title=None)),
+                    y=alt.Y("so_gcn:Q", title="Số GCN", stack="zero"),
+                    color=alt.Color(
+                        "trang_thai:N",
+                        title="Trạng thái",
+                        scale=alt.Scale(
+                            domain=["Đã thu kỳ tiếp", "Chưa thu kỳ tiếp"],
+                            range=["#2ca02c", "#d62728"],
+                        ),
+                        legend=alt.Legend(orient="bottom"),
+                    ),
+                    tooltip=[
+                        alt.Tooltip("thang_str:N", title="Tháng"),
+                        alt.Tooltip("trang_thai:N", title="Trạng thái"),
+                        alt.Tooltip("so_gcn:Q", title="Số GCN", format=",d"),
+                    ],
+                )
+                .properties(height=280)
+            )
+            st.altair_chart(bar_m, use_container_width=True)
 
     st.divider()
 
