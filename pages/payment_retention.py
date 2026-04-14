@@ -616,7 +616,7 @@ def _render_retention_curve(df_ky: pd.DataFrame, df_month: pd.DataFrame, product
     st.markdown("#### Tỷ lệ GCN còn thu phí qua từng kỳ")
     st.caption(
         "Kỳ 2 = 100% (tất cả HĐ bắt đầu đóng phí). "
-        "Mỗi đường mờ = tỷ lệ còn lại theo rates của 1 tháng. Đường đậm = trung bình."
+        "Cột xanh = % còn lại (tích lũy), cột đỏ = % bị mất tại kỳ đó. Dựa trên tỷ lệ duy trì trung bình."
     )
 
     df = df_month[df_month["san_pham"].isin(products)].copy()
@@ -631,91 +631,91 @@ def _render_retention_curve(df_ky: pd.DataFrame, df_month: pd.DataFrame, product
         st.info("Chưa đủ dữ liệu lịch sử.")
         return
 
-    df["thang_str"] = df["thang_tra_ky_k"].dt.strftime("%Y-%m")
-
     n_products = len(df["san_pham"].unique())
     cols = st.columns(min(n_products, 2))
 
     for i, sp in enumerate(sorted(df["san_pham"].unique())):
         sp_df = df[df["san_pham"] == sp].copy()
-        color = _PRODUCT_COLORS.get(sp, "steelblue")
 
-        # ── Đường trung bình: mean ty_le per ky → cumprod ─────────────────
+        # Tỷ lệ duy trì trung bình mỗi kỳ → tích lũy thành survival
         avg_rates = (
             sp_df.groupby("ky")["ty_le_giu_chan_pct"]
             .mean()
             .sort_index()
         )
-        avg_surv_rows = [{"ky": 2, "survival_pct": 100.0}]
+
+        # Xây dữ liệu waterfall: mỗi kỳ có (con_lai, mat, prev)
+        wf_rows = [{"ky_label": "Kỳ 2", "con_lai": 100.0, "mat": 0.0, "prev": 100.0}]
         surv = 100.0
         for ky, rate in avg_rates.items():
+            prev = surv
             surv = surv * rate / 100
-            avg_surv_rows.append({"ky": int(ky) + 1, "survival_pct": round(surv, 1)})
-        avg_surv_df = pd.DataFrame(avg_surv_rows)
+            drop = prev - surv
+            wf_rows.append({
+                "ky_label": f"Kỳ {int(ky) + 1}",
+                "con_lai": round(surv, 1),
+                "mat": round(drop, 1),
+                "prev": round(prev, 1),
+            })
+        wf_df = pd.DataFrame(wf_rows)
+        ky_order = list(wf_df["ky_label"])
 
-        # ── Đường mờ: implied survival từ rates của từng tháng ────────────
-        faint_rows = []
-        for thang, grp in sp_df.groupby("thang_str"):
-            rates = grp.set_index("ky")["ty_le_giu_chan_pct"].sort_index()
-            faint_rows.append({"thang_str": thang, "ky": 2, "survival_pct": 100.0})
-            s = 100.0
-            for ky, rate in rates.items():
-                s = s * rate / 100
-                faint_rows.append({"thang_str": thang, "ky": int(ky) + 1, "survival_pct": round(s, 1)})
-        faint_df = pd.DataFrame(faint_rows)
-
-        faint_lines = (
-            alt.Chart(faint_df)
-            .mark_line(opacity=0.2, strokeWidth=1.2, color=color)
+        # Cột xanh: từ 0 đến con_lai
+        bar_remain = (
+            alt.Chart(wf_df)
+            .mark_bar(color="#2ca02c", opacity=0.85)
             .encode(
-                x=alt.X("ky:O", title="Kỳ thu phí", axis=alt.Axis(labelAngle=0)),
-                y=alt.Y("survival_pct:Q", title="% HĐ còn lại", scale=alt.Scale(domain=[0, 105])),
-                detail="thang_str:N",
+                x=alt.X("ky_label:N", title="Kỳ thu phí", sort=ky_order, axis=alt.Axis(labelAngle=0)),
+                y=alt.Y("con_lai:Q", title="% GCN", scale=alt.Scale(domain=[0, 112])),
+                y2=alt.Y2(datum=0),
                 tooltip=[
-                    alt.Tooltip("thang_str:N", title="Tháng rates"),
-                    alt.Tooltip("ky:O", title="Kỳ"),
-                    alt.Tooltip("survival_pct:Q", title="% HĐ còn lại", format=".1f"),
+                    alt.Tooltip("ky_label:N", title="Kỳ"),
+                    alt.Tooltip("con_lai:Q", title="% còn lại (tích lũy)", format=".1f"),
                 ],
             )
         )
 
-        avg_line = (
-            alt.Chart(avg_surv_df)
-            .mark_line(strokeWidth=3, color=color)
+        # Cột đỏ nổi: từ con_lai đến prev (phần bị mất tại kỳ đó)
+        wf_lost = wf_df[wf_df["mat"] > 0.05]
+        bar_lost = (
+            alt.Chart(wf_lost)
+            .mark_bar(color="#d62728", opacity=0.75)
             .encode(
-                x=alt.X("ky:O"),
-                y=alt.Y("survival_pct:Q", scale=alt.Scale(domain=[0, 105])),
+                x=alt.X("ky_label:N", sort=ky_order),
+                y=alt.Y("prev:Q"),
+                y2=alt.Y2("con_lai:Q"),
                 tooltip=[
-                    alt.Tooltip("ky:O", title="Kỳ"),
-                    alt.Tooltip("survival_pct:Q", title="% HĐ còn lại TB", format=".1f"),
+                    alt.Tooltip("ky_label:N", title="Kỳ"),
+                    alt.Tooltip("mat:Q", title="% bị mất tại kỳ này", format=".1f"),
+                    alt.Tooltip("con_lai:Q", title="% còn lại (tích lũy)", format=".1f"),
                 ],
             )
         )
 
-        avg_points = (
-            alt.Chart(avg_surv_df)
-            .mark_point(filled=True, size=60, color=color)
+        # Label % còn lại phía trên cột
+        labels = (
+            alt.Chart(wf_df)
+            .mark_text(dy=-8, fontSize=11, fontWeight="bold", color="#155724")
             .encode(
-                x="ky:O",
-                y="survival_pct:Q",
-                tooltip=[
-                    alt.Tooltip("ky:O", title="Kỳ"),
-                    alt.Tooltip("survival_pct:Q", title="% GCN còn lại TB", format=".1f"),
-                ],
+                x=alt.X("ky_label:N", sort=ky_order),
+                y=alt.Y("con_lai:Q"),
+                text=alt.Text("con_lai:Q", format=".1f"),
             )
         )
 
-        avg_labels = (
-            alt.Chart(avg_surv_df)
-            .mark_text(dy=-12, fontSize=11, color=color)
+        # Label % mất (nhỏ hơn, màu đỏ) ở giữa cột đỏ
+        labels_lost = (
+            alt.Chart(wf_lost)
+            .mark_text(fontSize=9, color="white", fontWeight="bold")
             .encode(
-                x="ky:O",
-                y="survival_pct:Q",
-                text=alt.Text("survival_pct:Q", format=".1f"),
+                x=alt.X("ky_label:N", sort=ky_order),
+                y=alt.Y("y_mid:Q"),
+                text=alt.Text("mat:Q", format=".1f"),
             )
+            .transform_calculate(y_mid="(datum.con_lai + datum.prev) / 2")
         )
 
-        chart = (faint_lines + avg_line + avg_points + avg_labels).properties(title=sp, height=280)
+        chart = (bar_remain + bar_lost + labels + labels_lost).properties(title=sp, height=300)
         with cols[i % 2]:
             st.altair_chart(chart, use_container_width=True)
 
