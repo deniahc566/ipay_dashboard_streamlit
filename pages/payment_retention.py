@@ -452,48 +452,39 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
     df["gcn_fmt"]   = df["distinct_gcn"].apply(lambda x: f"{int(x):,}")
     df["hl_fmt"]    = df["hieu_luc"].apply(lambda x: f"{int(x):,}")
 
-    # ── Chart 1: Xu hướng theo tháng ─────────────────────────────────────────
+    # ── Chart 1: Xu hướng theo tháng — per-product columns (giống heatmap Q1)
     st.markdown("##### Tỷ lệ thu phí theo tháng thu phí")
     st.caption("% HĐ đang đóng phí / HĐ có hiệu lực theo từng tháng và sản phẩm.")
 
-    _color_enc = alt.Color(
-        "san_pham:N",
-        title="Sản phẩm",
-        scale=alt.Scale(
-            domain=list(_PRODUCT_COLORS.keys()),
-            range=list(_PRODUCT_COLORS.values()),
-        ),
-        legend=None,
-    )
-    _x_enc = alt.X("thang:T", timeUnit="yearmonth",
-                   axis=alt.Axis(format="%m/%Y", labelAngle=-45, title=None))
-    _y_enc = alt.Y("ty_le_pct:Q", title="% HĐ đang đóng phí", scale=alt.Scale(zero=False))
-    _tooltip = [
-        alt.Tooltip("thang_str:N", title="Tháng"),
-        alt.Tooltip("ty_le_pct:Q", title="% đang đóng phí", format=".1f"),
-        alt.Tooltip("gcn_fmt:N", title="HĐ đang đóng phí"),
-        alt.Tooltip("hl_fmt:N", title="HĐ có hiệu lực"),
-    ]
+    sp_list = sorted(df["san_pham"].unique())
+    n_sp = len(sp_list)
+    cols_q2 = st.columns(min(n_sp, 2))
 
-    line = (
-        alt.Chart(df)
-        .mark_line(point=True, strokeWidth=2)
-        .encode(x=_x_enc, y=_y_enc, color=_color_enc, tooltip=_tooltip)
-    )
-    text_labels = (
-        alt.Chart(df)
-        .mark_text(dy=-10, fontSize=9, fontWeight="bold")
-        .encode(x=_x_enc, y=_y_enc, color=_color_enc,
-                text=alt.Text("ty_le_pct:Q", format=".1f"))
-    )
-    n_sp = df["san_pham"].nunique()
-    trend = (
-        alt.layer(line, text_labels)
-        .properties(height=200)
-        .facet(facet=alt.Facet("san_pham:N", title=None), columns=min(n_sp, 2))
-        .resolve_scale(y="independent")
-    )
-    st.altair_chart(trend, width="stretch")
+    for i, sp in enumerate(sp_list):
+        sp_df = df[df["san_pham"] == sp].copy()
+        sp_color = _PRODUCT_COLORS.get(sp, "#1f77b4")
+        _x = alt.X("thang:T", timeUnit="yearmonth",
+                   axis=alt.Axis(format="%m/%Y", labelAngle=-45, title=None))
+        _y = alt.Y("ty_le_pct:Q", title="% HĐ đang đóng phí", scale=alt.Scale(zero=False))
+        _tt = [
+            alt.Tooltip("thang_str:N", title="Tháng"),
+            alt.Tooltip("ty_le_pct:Q", title="% đang đóng phí", format=".1f"),
+            alt.Tooltip("gcn_fmt:N", title="HĐ đang đóng phí"),
+            alt.Tooltip("hl_fmt:N", title="HĐ có hiệu lực"),
+        ]
+        line = (
+            alt.Chart(sp_df)
+            .mark_line(point=True, strokeWidth=2, color=sp_color)
+            .encode(x=_x, y=_y, tooltip=_tt)
+        )
+        text_labels = (
+            alt.Chart(sp_df)
+            .mark_text(dy=-10, fontSize=9, fontWeight="bold", color=sp_color)
+            .encode(x=_x, y=_y, text=alt.Text("ty_le_pct:Q", format=".1f"))
+        )
+        with cols_q2[i % min(n_sp, 2)]:
+            st.markdown(f"**{sp}**")
+            st.altair_chart((line + text_labels).properties(height=200), width="stretch")
 
 
 
