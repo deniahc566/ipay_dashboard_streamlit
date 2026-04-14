@@ -479,7 +479,7 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
         )
         text_labels = (
             alt.Chart(sp_df)
-            .mark_text(dy=-10, fontSize=9, fontWeight="bold", color=sp_color)
+            .mark_text(dy=-12, fontSize=11, fontWeight="bold", color=sp_color)
             .encode(x=_x, y=_y, text=alt.Text("ty_le_pct:Q", format=".1f"))
         )
         with cols_q2[i % min(n_sp, 2)]:
