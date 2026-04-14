@@ -497,17 +497,21 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
                     domain=list(_PRODUCT_COLORS.keys()),
                     range=list(_PRODUCT_COLORS.values()),
                 ),
+                legend=None,
             ),
-            xOffset="san_pham:N",
             tooltip=[
-                alt.Tooltip("san_pham:N", title="Sản phẩm"),
                 alt.Tooltip("thang_str:N", title="Tháng"),
                 alt.Tooltip("ty_le_pct:Q", title="% đang đóng phí", format=".1f"),
                 alt.Tooltip("gcn_fmt:N", title="HĐ đang đóng phí"),
                 alt.Tooltip("hl_fmt:N", title="HĐ có hiệu lực"),
             ],
         )
-        .properties(height=300)
+        .properties(height=180)
+        .facet(
+            facet=alt.Facet("san_pham:N", title=None),
+            columns=2,
+        )
+        .resolve_scale(y="independent")
     )
     st.altair_chart(trend, use_container_width=True)
 
