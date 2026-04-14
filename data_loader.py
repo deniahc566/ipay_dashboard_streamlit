@@ -95,6 +95,28 @@ def load_all_payment_tracking() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFram
 
 
 @st.cache_data(ttl=3600)
+def load_payment_retention_by_ky_thu() -> pd.DataFrame:
+    """
+    Load silver.payment_retention_by_ky_thu từ MotherDuck.
+
+    Bảng retention chính xác: với mỗi (san_pham, ky), chỉ tính GCN mà kỳ k+1
+    đã đến hạn (dựa theo ngay_hieu_luc thực tế, không dùng proxy 60 ngày).
+
+    Columns: san_pham, ky, so_gcn, da_tra_k1, chua_tra_k1, retention_pct
+    """
+    token = os.environ.get("MOTHERDUCK_TOKEN")
+    if not token:
+        raise EnvironmentError("MOTHERDUCK_TOKEN chưa được đặt trong biến môi trường.")
+
+    con = duckdb.connect(f"md:ipay_data?motherduck_token={token}")
+    try:
+        df = con.execute("SELECT * FROM silver.payment_retention_by_ky_thu").df()
+    finally:
+        con.close()
+    return df
+
+
+@st.cache_data(ttl=3600)
 def load_portfolio_health() -> pd.DataFrame:
     """
     Q2 — Sức khỏe danh mục: distinct GCN đã trả phí / GCN có hiệu lực theo tháng.

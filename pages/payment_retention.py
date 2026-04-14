@@ -14,7 +14,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 
-from data_loader import load_all_payment_tracking, load_portfolio_health
+from data_loader import load_all_payment_tracking, load_portfolio_health, load_payment_retention_by_ky_thu
 from ui_helpers import kpi_card
 
 _PRODUCTS = ["Cyber Risk", "HomeSaving", "I-Safe", "TapCare"]
@@ -612,23 +612,17 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
 
 # ── Retention Curve ───────────────────────────────────────────────────────────
 
-def _render_retention_curve(df_ky: pd.DataFrame, df_month: pd.DataFrame, products: list[str], min_gcn: int):
+def _render_retention_curve(df_retention: pd.DataFrame, products: list[str], min_gcn: int):
     st.markdown("#### Tỷ lệ GCN còn thu phí qua từng kỳ")
     st.caption(
         "Kỳ 2 = 100% (tất cả HĐ bắt đầu đóng phí). "
-        "Cột xanh = % còn lại (tích lũy), cột đỏ = % bị mất tại kỳ đó. Dựa trên tỷ lệ duy trì trung bình."
+        "Cột xanh = % còn lại (tích lũy), cột đỏ = % bị mất tại kỳ đó. "
+        "Chỉ tính GCN có kỳ k+1 đã đến hạn (tính theo ngày hiệu lực thực tế)."
     )
 
-    df = df_month[df_month["san_pham"].isin(products)].copy()
+    df = df_retention[df_retention["san_pham"].isin(products)].copy()
     if df.empty:
         st.info("Không có dữ liệu.")
-        return
-
-    # Chỉ dùng tháng mature (> 60 ngày) để tránh recency bias
-    cutoff = pd.Timestamp.now().normalize() - pd.Timedelta(days=60)
-    df = df[df["thang_tra_ky_k"] <= cutoff].copy()
-    if df.empty:
-        st.info("Chưa đủ dữ liệu lịch sử.")
         return
 
     n_products = len(df["san_pham"].unique())
@@ -637,12 +631,8 @@ def _render_retention_curve(df_ky: pd.DataFrame, df_month: pd.DataFrame, product
     for i, sp in enumerate(sorted(df["san_pham"].unique())):
         sp_df = df[df["san_pham"] == sp].copy()
 
-        # Tỷ lệ duy trì trung bình mỗi kỳ → tích lũy thành survival
-        avg_rates = (
-            sp_df.groupby("ky")["ty_le_giu_chan_pct"]
-            .mean()
-            .sort_index()
-        )
+        # retention_pct đã là tỷ lệ chính xác theo GCN thực tế (không dùng MEAN)
+        avg_rates = sp_df.set_index("ky")["retention_pct"].sort_index()
 
         # Xây dữ liệu waterfall: mỗi kỳ có (con_lai, mat, prev)
         wf_rows = [{"ky_label": "Kỳ 2", "con_lai": 100.0, "mat": 0.0, "prev": 100.0}]
@@ -992,12 +982,14 @@ def render_payment_retention_page():
         ):
             load_all_payment_tracking.clear()
             load_portfolio_health.clear()
+            load_payment_retention_by_ky_thu.clear()
             st.rerun()
 
     # ── Load data ─────────────────────────────────────────────────────────────
     try:
         df_ky, df_month, df_date = load_all_payment_tracking()
         df_health = load_portfolio_health()
+        df_retention = load_payment_retention_by_ky_thu()
     except Exception as e:
         st.error(f"Không thể tải dữ liệu: {e}")
         st.info(
@@ -1076,7 +1068,7 @@ def render_payment_retention_page():
         _render_q2_tab(df_health, selected_products)
 
     with tab3:
-        _render_retention_curve(df_ky, df_month, selected_products, min_gcn)
+        _render_retention_curve(df_retention, selected_products, min_gcn)
 
     with tab4:
         _render_payment_date_table(df_date, selected_products)
