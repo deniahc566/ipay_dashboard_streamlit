@@ -480,7 +480,7 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
 
     trend = (
         alt.Chart(df)
-        .mark_line(point=True, strokeWidth=2)
+        .mark_bar()
         .encode(
             x=alt.X("thang:T",
                     timeUnit="yearmonth",
@@ -498,6 +498,7 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
                     range=list(_PRODUCT_COLORS.values()),
                 ),
             ),
+            xOffset="san_pham:N",
             tooltip=[
                 alt.Tooltip("san_pham:N", title="Sản phẩm"),
                 alt.Tooltip("thang_str:N", title="Tháng"),
