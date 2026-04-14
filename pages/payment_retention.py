@@ -690,44 +690,44 @@ def _render_payment_date_table(df_date: pd.DataFrame, products: list[str]) -> No
     # ── Biểu đồ ─────────────────────────────────────────────────────────────
     # Chart 1: Stacked bar — Số GCN đã/chưa thu kỳ tiếp
     st.markdown(f"##### Số GCN theo ngày — {ky_label}")
-        agg = (
-            df_chart.groupby("ngay")
-            .agg(da_thu=("da_tra_ky_tiep", "sum"), chua_thu=("chua_tra_ky_tiep", "sum"))
-            .reset_index()
-        )
-        melted = agg.melt(
-            id_vars=["ngay"],
-            value_vars=["da_thu", "chua_thu"],
-            var_name="trang_thai",
-            value_name="so_gcn",
-        )
-        melted["trang_thai"] = melted["trang_thai"].map(
-            {"da_thu": "Đã thu kỳ tiếp", "chua_thu": "Chưa thu kỳ tiếp"}
-        )
-        bar = (
-            alt.Chart(melted)
-            .mark_bar()
-            .encode(
-                x=alt.X("ngay:O", title="Ngày", axis=alt.Axis(labelAngle=0)),
-                y=alt.Y("so_gcn:Q", title="Số GCN", stack="zero"),
-                color=alt.Color(
-                    "trang_thai:N",
-                    title="Trạng thái",
-                    scale=alt.Scale(
-                        domain=["Đã thu kỳ tiếp", "Chưa thu kỳ tiếp"],
-                        range=["#2ca02c", "#d62728"],
-                    ),
-                    legend=alt.Legend(orient="bottom"),
+    agg = (
+        df_chart.groupby("ngay")
+        .agg(da_thu=("da_tra_ky_tiep", "sum"), chua_thu=("chua_tra_ky_tiep", "sum"))
+        .reset_index()
+    )
+    melted = agg.melt(
+        id_vars=["ngay"],
+        value_vars=["da_thu", "chua_thu"],
+        var_name="trang_thai",
+        value_name="so_gcn",
+    )
+    melted["trang_thai"] = melted["trang_thai"].map(
+        {"da_thu": "Đã thu kỳ tiếp", "chua_thu": "Chưa thu kỳ tiếp"}
+    )
+    bar = (
+        alt.Chart(melted)
+        .mark_bar()
+        .encode(
+            x=alt.X("ngay:O", title="Ngày", axis=alt.Axis(labelAngle=0)),
+            y=alt.Y("so_gcn:Q", title="Số GCN", stack="zero"),
+            color=alt.Color(
+                "trang_thai:N",
+                title="Trạng thái",
+                scale=alt.Scale(
+                    domain=["Đã thu kỳ tiếp", "Chưa thu kỳ tiếp"],
+                    range=["#2ca02c", "#d62728"],
                 ),
-                tooltip=[
-                    alt.Tooltip("ngay:O", title="Ngày"),
-                    alt.Tooltip("trang_thai:N", title="Trạng thái"),
-                    alt.Tooltip("so_gcn:Q", title="Số GCN", format=",d"),
-                ],
-            )
-            .properties(height=280)
+                legend=alt.Legend(orient="bottom"),
+            ),
+            tooltip=[
+                alt.Tooltip("ngay:O", title="Ngày"),
+                alt.Tooltip("trang_thai:N", title="Trạng thái"),
+                alt.Tooltip("so_gcn:Q", title="Số GCN", format=",d"),
+            ],
         )
-        st.altair_chart(bar, use_container_width=True)
+        .properties(height=280)
+    )
+    st.altair_chart(bar, use_container_width=True)
 
     st.divider()
 
