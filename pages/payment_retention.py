@@ -448,62 +448,6 @@ def _render_q1_tab(df_ky: pd.DataFrame, products: list[str]) -> None:
             )
             st.altair_chart(hm_chart, use_container_width=True)
 
-    # ── Chart 2: Tỉ lệ thu theo từng kỳ ─────────────────────────────────────
-    st.markdown("##### Tỉ lệ thu theo từng kỳ")
-    st.caption("Tổng hợp tất cả các tháng. Cho thấy kỳ nào khó thu nhất.")
-
-    grp_ky = (
-        df.groupby(["san_pham", "ky", "trang_thai"])["so_gcn"]
-        .sum()
-        .reset_index()
-    )
-    wide_ky = grp_ky.pivot_table(
-        index=["san_pham", "ky"],
-        columns="trang_thai",
-        values="so_gcn",
-        aggfunc="sum",
-    ).fillna(0).reset_index()
-    wide_ky.columns.name = None
-    if "da_thu" not in wide_ky.columns:
-        wide_ky["da_thu"] = 0
-    if "chua_thu_qua_han" not in wide_ky.columns:
-        wide_ky["chua_thu_qua_han"] = 0
-    da_k = np.array(wide_ky["da_thu"], dtype=float)
-    to_k = da_k + np.array(wide_ky["chua_thu_qua_han"], dtype=float)
-    wide_ky["ty_le_pct"]   = np.where(to_k > 0, np.round(da_k / to_k * 100, 1), np.nan)
-    wide_ky["da_thu_fmt"]  = wide_ky["da_thu"].apply(lambda x: f"{int(x):,}")
-    wide_ky["qua_han_fmt"] = wide_ky["chua_thu_qua_han"].apply(lambda x: f"{int(x):,}")
-
-    bar_chart = (
-        alt.Chart(wide_ky)
-        .mark_bar()
-        .encode(
-            x=alt.X("ky:O", title="Kỳ", axis=alt.Axis(labelAngle=0)),
-            y=alt.Y(
-                "ty_le_pct:Q",
-                title="Tỉ lệ thu (%)",
-                scale=alt.Scale(zero=False),
-            ),
-            color=alt.Color(
-                "san_pham:N",
-                title="Sản phẩm",
-                scale=alt.Scale(
-                    domain=list(_PRODUCT_COLORS.keys()),
-                    range=list(_PRODUCT_COLORS.values()),
-                ),
-            ),
-            xOffset="san_pham:N",
-            tooltip=[
-                alt.Tooltip("san_pham:N", title="Sản phẩm"),
-                alt.Tooltip("ky:O", title="Kỳ"),
-                alt.Tooltip("ty_le_pct:Q", title="Tỉ lệ thu (%)", format=".1f"),
-                alt.Tooltip("da_thu_fmt:N", title="Đã thu"),
-                alt.Tooltip("qua_han_fmt:N", title="Quá hạn chưa thu"),
-            ],
-        )
-        .properties(height=300)
-    )
-    st.altair_chart(bar_chart, use_container_width=True)
 
 
 # ── Tab Q2: Sức khỏe danh mục ────────────────────────────────────────────────
