@@ -13,6 +13,7 @@ Trang phân tích tỉ lệ thu phí và duy trì đóng phí theo kỳ.
 import streamlit as st
 import pandas as pd
 import altair as alt
+import numpy as np
 
 from data_loader import load_all_payment_tracking, load_portfolio_health, load_payment_retention_by_ky_thu
 from ui_helpers import kpi_card
@@ -48,7 +49,6 @@ def _pct_fmt(v):
 def _scorecard_metrics(
     df_ky: pd.DataFrame,
     df_month: pd.DataFrame,
-    df_date: pd.DataFrame,
     df_health: pd.DataFrame,
     df_retention: pd.DataFrame,
     products: list[str],
@@ -98,8 +98,6 @@ def _scorecard_metrics(
             best_ky = int(by_ky["retention_pct"].idxmax())
             best_ky_ret = float(by_ky["retention_pct"].max())
 
-    ret_overall = None
-
     # Q2 — Sức khỏe danh mục: distinct GCN đang đóng phí / GCN có hiệu lực
     # Dùng tháng mới nhất có đủ cả distinct_gcn lẫn hieu_luc cho các sản phẩm đang chọn
     df_health_filtered = df_health[
@@ -139,7 +137,6 @@ def _scorecard_metrics(
         da_thu=int(da_thu), qua_han=int(qua_han), tong=int(tong),
         ty_le=ty_le, ty_le_delta=ty_le_delta,
         best_ky=best_ky, best_ky_ret=best_ky_ret,
-        ret_overall=ret_overall,
         dropoff_ky=dropoff_ky, dropoff_val=dropoff_val,
         active_gcn=active_gcn, active_hieu_luc=active_hieu_luc,
         ty_le_active=ty_le_active, active_month_label=active_month_label,
@@ -151,12 +148,11 @@ def _scorecard_metrics(
 def _render_scorecard(
     df_ky: pd.DataFrame,
     df_month: pd.DataFrame,
-    df_date: pd.DataFrame,
     df_health: pd.DataFrame,
     df_retention: pd.DataFrame,
     products: list[str],
 ) -> None:
-    m = _scorecard_metrics(df_ky, df_month, df_date, df_health, df_retention, products)
+    m = _scorecard_metrics(df_ky, df_month, df_health, df_retention, products)
 
     # ── Row 1: 5 KPI cards ────────────────────────────────────────────────────
     c1, c2, c3, c4, c5 = st.columns(5)
@@ -349,8 +345,6 @@ def _render_scorecard(
 # ── Tab Q1: Hiệu quả thu trong kỳ ────────────────────────────────────────────
 
 def _render_q1_tab(df_ky: pd.DataFrame, products: list[str]) -> None:
-    import numpy as np
-
     df = df_ky[df_ky["san_pham"].isin(products) & (df_ky["ky"] >= 2)].copy()
     if df.empty:
         st.info("Không có dữ liệu.")
@@ -460,18 +454,19 @@ def _render_q2_tab(df_health: pd.DataFrame, products: list[str]) -> None:
     n_sp = len(sp_list)
     cols_q2 = st.columns(min(n_sp, 2))
 
+    _x = alt.X("thang:T", timeUnit="yearmonth",
+               axis=alt.Axis(format="%m/%Y", labelAngle=-45, title=None))
+    _y = alt.Y("ty_le_pct:Q", title="% HĐ đang đóng phí", scale=alt.Scale(zero=False))
+    _tt = [
+        alt.Tooltip("thang_str:N", title="Tháng"),
+        alt.Tooltip("ty_le_pct:Q", title="% đang đóng phí", format=".1f"),
+        alt.Tooltip("gcn_fmt:N", title="HĐ đang đóng phí"),
+        alt.Tooltip("hl_fmt:N", title="HĐ có hiệu lực"),
+    ]
+
     for i, sp in enumerate(sp_list):
-        sp_df = df[df["san_pham"] == sp].copy()
+        sp_df = df[df["san_pham"] == sp]
         sp_color = _PRODUCT_COLORS.get(sp, "#1f77b4")
-        _x = alt.X("thang:T", timeUnit="yearmonth",
-                   axis=alt.Axis(format="%m/%Y", labelAngle=-45, title=None))
-        _y = alt.Y("ty_le_pct:Q", title="% HĐ đang đóng phí", scale=alt.Scale(zero=False))
-        _tt = [
-            alt.Tooltip("thang_str:N", title="Tháng"),
-            alt.Tooltip("ty_le_pct:Q", title="% đang đóng phí", format=".1f"),
-            alt.Tooltip("gcn_fmt:N", title="HĐ đang đóng phí"),
-            alt.Tooltip("hl_fmt:N", title="HĐ có hiệu lực"),
-        ]
         line = (
             alt.Chart(sp_df)
             .mark_line(point=True, strokeWidth=2, color=sp_color)
@@ -930,7 +925,7 @@ def render_payment_retention_page():
     st.divider()
 
     # ── Scorecard ─────────────────────────────────────────────────────────────
-    _render_scorecard(df_ky, df_month, df_date, df_health, df_retention, selected_products)
+    _render_scorecard(df_ky, df_month, df_health, df_retention, selected_products)
 
     st.divider()
 

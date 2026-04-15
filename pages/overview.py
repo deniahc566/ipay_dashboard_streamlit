@@ -78,8 +78,6 @@ def render_overview_page():
     ]
     yoy_tien    = yoy_df["Tiền thực thu"].sum()
     yoy_cap_moi = int(yoy_df["Số đơn cấp mới"].sum())
-    yoy_tai_tuc = int(yoy_df["Số đơn cấp tái tục"].sum())
-
     # ── Shared alias ─────────────────────────────────────────────────────────
     _DISPLAY_NAMES = PRODUCT_DISPLAY_NAMES
 
