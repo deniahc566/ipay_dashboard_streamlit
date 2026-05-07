@@ -640,7 +640,7 @@ def render_homesaving_page():
                 f'<td style="padding:4px 8px;font-weight:500;">{d.day}</td>'
                 f'<td style="padding:4px 8px;text-align:right;">'
                 f'{_arrow(tien, tien_30)}{tien:,.0f}</td>'
-                f'<td style="padding:4px 8px;text-align:right;color:#5c4400;">{doi_soat:,.0f}</td>'
+                f'<td style="padding:4px 8px;text-align:right;color:{"#c62828" if doi_soat != tien else "#5c4400"};">{doi_soat:,.0f}</td>'
                 f'<td style="padding:4px 8px;text-align:right;color:#888;">{tien_30:,.0f}</td>'
                 f'<td style="padding:4px 8px;text-align:right;color:#2C4C7B;">{tien_dk:,.0f}</td>'
                 f'<td style="padding:4px 8px;text-align:right;">'
