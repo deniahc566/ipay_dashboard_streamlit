@@ -196,3 +196,25 @@ def load_portfolio_health() -> pd.DataFrame:
 
     df["thang"] = pd.to_datetime(df["thang"])
     return df
+
+
+@st.cache_data(ttl=3600)
+def load_thu_phi_by_day() -> pd.DataFrame:
+    """
+    Load silver.payment_by_day từ MotherDuck.
+
+    Columns: san_pham, ngay_thu_phi, so_giao_dich, tong_phi
+    Được build hàng ngày bởi flow outlook-payment-daily (Task 5).
+    """
+    token = os.environ.get("MOTHERDUCK_TOKEN")
+    if not token:
+        raise EnvironmentError("MOTHERDUCK_TOKEN chưa được đặt trong biến môi trường.")
+    con = duckdb.connect(f"md:ipay_data?motherduck_token={token}")
+    try:
+        df = con.execute("SELECT * FROM silver.payment_by_day").df()
+    finally:
+        con.close()
+    df["ngay_thu_phi"] = pd.to_datetime(df["ngay_thu_phi"])
+    df["so_giao_dich"] = pd.to_numeric(df["so_giao_dich"], errors="coerce").fillna(0).astype(int)
+    df["tong_phi"]     = pd.to_numeric(df["tong_phi"],     errors="coerce").fillna(0.0)
+    return df

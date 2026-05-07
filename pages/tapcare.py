@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 
-from data_loader import load_ipay_data
+from data_loader import load_ipay_data, load_thu_phi_by_day
 from ui_helpers import render_action_buttons, fmt_currency, kpi_card, yoy_caption
 
 _PROD_CODE = "TAPCARE"
@@ -549,8 +549,14 @@ def render_tapcare_page():
                 return f'<span style="color:{c}">▼&nbsp;</span>'
             return ""
 
+        _thu_phi_raw = load_thu_phi_by_day()
+        _doi_soat_map = {
+            row["ngay_thu_phi"]: int(row["so_giao_dich"]) * 6000
+            for _, row in _thu_phi_raw[_thu_phi_raw["san_pham"] == "TapCare"].iterrows()
+        }
+
         tot_so_don = tot_so_don_30 = 0.0
-        tot_tien = tot_tien_30 = tot_tien_dk = 0.0
+        tot_tien = tot_doi_soat = tot_tien_30 = tot_tien_dk = 0.0
         tot_cap_moi = tot_cap_moi_30 = 0.0
         tot_huy = tot_tai_tuc = tot_tai_tuc_dk = tot_tang_truong = 0.0
 
@@ -572,12 +578,14 @@ def render_tapcare_page():
             so_don      = tien / _PHI_DON
             so_don_30   = tien_30 / _PHI_DON
             tien_dk     = (cap_moi_10 - huy_30) * _PHI_DON * 0.95 + tien_30 * 0.95
+            doi_soat    = float(_doi_soat_map.get(d, 0.0))
             tt_rate     = tai_tuc / ttdk if ttdk > 0 else 0.0
             tang_truong = cap_moi - huy - ttdk + tai_tuc
 
             tot_so_don      += so_don
             tot_so_don_30   += so_don_30
             tot_tien        += tien
+            tot_doi_soat    += doi_soat
             tot_tien_30     += tien_30
             tot_tien_dk     += tien_dk
             tot_cap_moi     += cap_moi
@@ -605,6 +613,7 @@ def render_tapcare_page():
                 f'<td style="padding:4px 8px;text-align:right;color:#888;">{int(round(so_don_30)):,}</td>'
                 f'<td style="padding:4px 8px;text-align:right;">'
                 f'{_arrow(tien, tien_30)}{tien:,.0f}</td>'
+                f'<td style="padding:4px 8px;text-align:right;color:#5c4400;">{doi_soat:,.0f}</td>'
                 f'<td style="padding:4px 8px;text-align:right;color:#888;">{tien_30:,.0f}</td>'
                 f'<td style="padding:4px 8px;text-align:right;color:#2C4C7B;">{tien_dk:,.0f}</td>'
                 f'<td style="padding:4px 8px;text-align:right;">'
@@ -626,6 +635,7 @@ def render_tapcare_page():
             f'<td style="padding:5px 8px;text-align:right;">{int(round(tot_so_don)):,}</td>'
             f'<td style="padding:5px 8px;text-align:right;opacity:0.75;">{int(round(tot_so_don_30)):,}</td>'
             f'<td style="padding:5px 8px;text-align:right;">{tot_tien:,.0f}</td>'
+            f'<td style="padding:5px 8px;text-align:right;">{tot_doi_soat:,.0f}</td>'
             f'<td style="padding:5px 8px;text-align:right;opacity:0.75;">{tot_tien_30:,.0f}</td>'
             f'<td style="padding:5px 8px;text-align:right;">{tot_tien_dk:,.0f}</td>'
             f'<td style="padding:5px 8px;text-align:right;">{int(tot_cap_moi):,}</td>'
@@ -641,6 +651,7 @@ def render_tapcare_page():
             "Số đơn thu phí",
             "Số đơn thu phí 30NT",
             "Tiền thực thu",
+            "Tiền đối soát",
             "Tiền TT 30NT",
             "Tiền TT dự kiến",
             "Số đơn cấp mới",
