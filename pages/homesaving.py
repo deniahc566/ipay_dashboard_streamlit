@@ -160,7 +160,7 @@ def render_homesaving_page():
         _kh_color = "#2e7d32" if delta_kh >= 0 else "#c62828"
         _kh_sign  = "+" if delta_kh >= 0 else ""
         st.markdown(kpi_card(
-            label="Tổng số KH hiện hữu",
+            label="Số GCN có hiệu lực",
             value=f"{kh_hien_huu:,}",
             delta_str=f"{_kh_sign}{delta_kh:,}",
             delta_color=_kh_color,
