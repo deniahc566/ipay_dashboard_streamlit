@@ -18,6 +18,45 @@ def _chart_title(text: str) -> None:
     )
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def _build_excel_report(month: int, year: int) -> bytes:
+    from excel_report import build_report_bytes, load_report_data
+
+    return build_report_bytes(load_report_data(), month, year)
+
+
+def _render_excel_export() -> None:
+    """Popover chọn tháng/năm và tải báo cáo Excel Tổng Tiền thực thu."""
+    from datetime import date
+
+    today = date.today()
+    _, col_export = st.columns([6, 2])
+    with col_export:
+        with st.popover("📥 Xuất báo cáo Excel", width="stretch"):
+            c1, c2 = st.columns(2)
+            month = c1.selectbox("Tháng", list(range(1, 13)), index=today.month - 1,
+                                 key="excel_export_month")
+            years = list(range(today.year, today.year - 5, -1))
+            year = c2.selectbox("Năm", years, index=0, key="excel_export_year")
+            if st.button("Tạo báo cáo", key="excel_export_build", width="stretch"):
+                try:
+                    with st.spinner("Đang tạo báo cáo..."):
+                        st.session_state.excel_export = (
+                            month, year, _build_excel_report(month, year)
+                        )
+                except Exception as e:
+                    st.error(f"Không thể tạo báo cáo: {e}")
+            cached = st.session_state.get("excel_export")
+            if cached and cached[:2] == (month, year):
+                st.download_button(
+                    "⬇️ Tải xuống",
+                    data=cached[2],
+                    file_name=f"bao_cao_doanh_thu_t{month:02d}_{year}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    width="stretch",
+                )
+
+
 def render_overview_page():
     st.markdown(
         '<style>section[data-testid="stMain"]{zoom:1;}</style>',
@@ -29,6 +68,7 @@ def render_overview_page():
         unsafe_allow_html=True,
     )
     render_action_buttons()
+    _render_excel_export()
 
     try:
         full_df = load_ipay_data()
